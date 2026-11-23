@@ -19,6 +19,13 @@ jobs:
         with:
           node-version: 22
 
+      - name: Gemini API 키 넣기 (GitHub Secret)
+        shell: bash
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          node -e "require('fs').writeFileSync('www/config.js','window.APP_CONFIG = { geminiKey: '+JSON.stringify(process.env.GEMINI_API_KEY||'')+' };\n')"
+
       - name: Install
         run: npm install
 
@@ -47,6 +54,13 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+
+      - name: Gemini API 키 넣기 (GitHub Secret)
+        shell: bash
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          node -e "require('fs').writeFileSync('www/config.js','window.APP_CONFIG = { geminiKey: '+JSON.stringify(process.env.GEMINI_API_KEY||'')+' };\n')"
 
       - name: Capacitor 안드로이드 프로젝트 만들기
         run: |
@@ -153,6 +167,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Gemini API 키 넣기 (GitHub Secret)
+        shell: bash
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          node -e "require('fs').writeFileSync('www/config.js','window.APP_CONFIG = { geminiKey: '+JSON.stringify(process.env.GEMINI_API_KEY||'')+' };\n')"
 
       - name: gh-pages 브랜치로 배포
         run: |

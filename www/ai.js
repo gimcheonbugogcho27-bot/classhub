@@ -19,6 +19,10 @@
     ['🎲 아이스브레이킹', '수업 시작 전 3분 안에 할 수 있는 재미있는 활동 5가지를 알려 줘.']
   ];
 
+  // 빌드할 때 GitHub Secret(GEMINI_API_KEY)이 config.js 로 들어오면 그 키를 쓰고, 키 입력 화면은 숨깁니다.
+  var EMBED = String((window.APP_CONFIG && window.APP_CONFIG.geminiKey) || '').trim();
+  function getKey() { return EMBED || store.get(K_KEY, ''); }
+
   var msgs = (function () { var m = store.get(K_CHAT, []); return Array.isArray(m) ? m : []; })();
   var busy = false, ctrl = null;
 
@@ -92,7 +96,7 @@
   fillModels(FALLBACK_MODELS);
 
   function loadModels(quiet) {
-    var key = store.get(K_KEY, '');
+    var key = getKey();
     if (!key) return Promise.resolve();
     return fetch(API + 'models?pageSize=100', { headers: { 'x-goog-api-key': key } })
       .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw apiErr(r.status, j); }); })
@@ -145,7 +149,7 @@
   function send() {
     if (busy) { if (ctrl) ctrl.abort(); return; }
     var text = input.value.trim(); if (!text) return;
-    var key = store.get(K_KEY, '');
+    var key = getKey();
     if (!key) { openKey(); toast('먼저 Google API 키를 넣어 주세요'); return; }
     input.value = ''; autosize();
     msgs = msgs.filter(function (m) { return !m.error; });
@@ -222,7 +226,8 @@
 
   // ---------- API 키 · 설정 ----------
   function openKey() {
-    $('aiKey').value = store.get(K_KEY, '');
+    if (EMBED) return;
+    $('aiKey').value = getKey();
     $('aiKey').type = 'password';
     $('aiSys').value = store.get(K_SYS, '');
     $('aiSys').placeholder = DEFAULT_SYS;
@@ -248,11 +253,12 @@
   document.addEventListener('tabchange', function (e) {
     if (e.detail !== 'ai') return;
     chat.scrollTop = chat.scrollHeight;
-    if (!store.get(K_KEY, '')) $('aiHint').hidden = false; else $('aiHint').hidden = true;
+    $('aiHint').hidden = !!getKey();
   });
 
+  if (EMBED) { $('aiKeyBtn').hidden = true; $('aiHint').hidden = true; }
   render();
-  if (store.get(K_KEY, '')) loadModels(true);
+  if (getKey()) loadModels(true);
   else $('aiHint').hidden = false;
   $('aiHint').onclick = openKey;
 })();

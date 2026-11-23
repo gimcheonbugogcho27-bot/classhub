@@ -13,13 +13,18 @@
 
 단축키: `1`~`6` 탭 이동 · `Space` 시작/멈춤 · `R` 초기화 · `T` 테마 · `M` 작은 창 · `F11` 전체화면
 
-## AI(Google API) 설정
-1. https://aistudio.google.com/apikey 에서 API 키를 만듭니다.
-2. 앱의 **AI 탭 → 🔑 API 키**에 붙여넣고 저장합니다.
+## AI(Google API) 키 넣기
+키는 저장소 코드에 넣지 않고, **빌드할 때 GitHub Secret 으로 자동으로 들어갑니다.** (앱에는 키 입력란이 나오지 않습니다)
 
-- 키는 코드·저장소에 들어 있지 않습니다. 각자 기기의 앱 저장소(localStorage)에만 저장되고 Google 서버로만 전송됩니다.
+1. https://aistudio.google.com/apikey 에서 API 키를 만듭니다.
+2. 저장소 **Settings → Secrets and variables → Actions → New repository secret**
+   - Name: `GEMINI_API_KEY` / Secret: 만든 키
+3. **Actions 탭 → Build EXE & APK → Run workflow** 로 다시 빌드합니다.
+
+- Secret 이 없으면 AI 탭에 🔑 키 입력 버튼이 대신 나타납니다.
+- 주의: 키는 설치 파일 안에 들어가므로, 파일을 가진 사람은 키를 꺼낼 수 있습니다. Google AI Studio/Cloud 에서 이 키의 사용 한도를 낮게 걸어 두세요.
 - 학생 이름·연락처 등 개인정보는 입력하지 마세요.
-- 모델 목록은 키로 Google에서 불러옵니다. 기본값은 `gemini-flash-latest` 입니다.
+- 모델 목록은 키로 Google 에서 불러옵니다. 기본값은 `gemini-flash-latest` 입니다.
 
 ## 빌드 (자동)
 `main` 브랜치에 올리면 GitHub Actions 가 자동으로 만듭니다.
