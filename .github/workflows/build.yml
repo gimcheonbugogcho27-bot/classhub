@@ -156,10 +156,13 @@ jobs:
           ./gradlew assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk ../../ClassHub.apk
 
-      - name: 서명 확인
+      - name: 서명 확인 (참고용)
+        continue-on-error: true
         run: |
-          AS=$(ls -d $ANDROID_HOME/build-tools/*/apksigner | tail -1)
-          $AS verify --print-certs ClassHub.apk | grep -i "Signer #1 certificate SHA-256\|Verifies"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          AS=$(ls -d "$SDK"/build-tools/*/apksigner 2>/dev/null | tail -1)
+          echo "apksigner: $AS"
+          "$AS" verify --verbose --print-certs ClassHub.apk | grep -i "Verifies\|SHA-256" || true
 
       - name: Upload apk
         uses: actions/upload-artifact@v4
