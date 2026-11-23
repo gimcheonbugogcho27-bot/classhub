@@ -4,13 +4,21 @@
 (function () {
   'use strict';
   var API = 'https://generativelanguage.googleapis.com/v1beta/';
-  var K_KEY = 'ai.key', K_MODEL = 'ai.model', K_SYS = 'ai.sys', K_CHAT = 'ai.chat', K_CONVS = 'ai.convs', K_CUR = 'ai.cur', K_PROMPTS = 'ai.prompts';
+  var K_KEY = 'ai.key', K_MODEL = 'ai.model', K_SYS = 'ai.sys', K_CHAT = 'ai.chat', K_CONVS = 'ai.convs', K_CUR = 'ai.cur', K_PROMPTS = 'ai.prompts', K_IMGMODEL = 'ai.imgmodel', K_IMGAR = 'ai.imgar';
   var DEFAULT_SYS = '당신은 초등학교 선생님과 학생을 돕는 친절한 한국어 AI 도우미입니다. 쉽고 짧게 답하고, 필요하면 목록으로 정리하세요. 모르는 것은 모른다고 말하세요.';
   var FALLBACK_MODELS = [
     ['gemini-flash-latest', 'Gemini Flash (빠름 · 기본)'],
     ['gemini-flash-lite-latest', 'Gemini Flash-Lite (더 빠름)'],
     ['gemini-pro-latest', 'Gemini Pro (더 똑똑함)']
   ];
+  // 이미지 만들기 모델 (Gemini 'Nano Banana' 계열) 과 그림 비율
+  var IMG_MODELS = [
+    ['gemini-3.1-flash-lite-image', '빠르고 저렴 (Nano Banana 2 Lite)'],
+    ['gemini-3.1-flash-image', '균형 (Nano Banana 2)'],
+    ['gemini-3-pro-image', '고품질 (Nano Banana Pro)']
+  ];
+  var IMG_BACKUP = ['gemini-2.5-flash-image'];
+  var IMG_ASPECTS = [['1:1', '정사각형 1:1'], ['16:9', '가로 16:9'], ['9:16', '세로 9:16'], ['4:3', '가로 4:3'], ['3:4', '세로 3:4 (A4 비슷)'], ['', '비율 자동']];
   var QUICK = [
     ['📝 알림장', '4학년 학급 알림장을 써 줘. 내용: '],
     ['📣 가정통신문', '학부모님께 보낼 가정통신문 초안을 써 줘. 주제: '],
@@ -41,9 +49,9 @@
     if (store.get(K_CHAT, []).length) store.set(K_CHAT, []);
   })();
   function findConv(id) { return convs.filter(function (c) { return c.id === id; })[0]; }
-  function cp(m) { var o = { role: m.role, text: m.text }; if (m.thumbs && m.thumbs.length) o.thumbs = m.thumbs; return o; }   // 저장용 사본 (사진은 작은 썸네일만)
+  function cp(m) { var o = { role: m.role, text: m.text }; if (m.thumbs && m.thumbs.length) o.thumbs = m.thumbs; if (m.images && m.images.length) o.images = m.images; return o; }   // 저장용 사본 (사진은 작은 썸네일만)
   var msgs = (function () { var c = findConv(curId); return c ? c.msgs.map(cp) : []; })();
-  var busy = false, ctrl = null;
+  var busy = false, ctrl = null, imgMode = false;
 
   var chat = $('aiChat'), input = $('aiIn'), sendBtn = $('aiSend'), modelSel = $('aiModel');
 
@@ -98,10 +106,16 @@
       m.thumbs.forEach(function (t) { var i = document.createElement('img'); i.src = t; i.alt = '첨부 사진'; im.appendChild(i); });
       body.insertBefore(im, body.firstChild);
     }
+    if (m.images && m.images.length) {
+      var gi = document.createElement('div'); gi.className = 'gen';
+      m.images.forEach(function (u) { var i = document.createElement('img'); i.src = u; i.alt = 'AI가 만든 그림'; gi.appendChild(i); });
+      body.appendChild(gi);
+    }
     d.appendChild(body);
-    if (m.role !== 'user' && m.text && !m.error) {
+    if (m.role !== 'user' && (m.text || (m.images && m.images.length)) && !m.error) {
       var act = document.createElement('div'); act.className = 'act';
-      act.innerHTML = '<button data-copy="' + idx + '">📋 복사</button>';
+      act.innerHTML = '<button data-copy="' + idx + '">📋 복사</button>' +
+        (m.images && m.images.length ? '<button data-saveimg="' + idx + '">💾 그림 저장</button><button data-editimg="' + idx + '">✏️ 이어서 고치기</button>' : '');
       d.appendChild(act);
     }
     return d;
@@ -130,12 +144,20 @@
     c.msgs = keep; if (!c.custom) c.title = titleOf(keep); c.updated = Date.now();
     convs.sort(function (a, b) { return b.updated - a.updated; });
     if (convs.length > 50) convs = convs.slice(0, 50);
+    var json = JSON.stringify(convs), guard = 0;
+    while (json.length > 3500000 && guard++ < 60) {     // 너무 커지면 오래된 대화의 그림부터 덜어냄
+      var old = convs.slice().reverse().filter(function (x) { return x.msgs.some(function (m) { return m.images || m.thumbs; }); })[0];
+      if (old) old.msgs.forEach(function (m) { delete m.images; delete m.thumbs; }); else convs.pop();
+      json = JSON.stringify(convs);
+    }
     store.set(K_CONVS, convs); store.set(K_CUR, curId);
   }
 
   chat.addEventListener('click', function (e) {
     var q = e.target.closest('[data-qr]'); if (q) { window.qrFrom(q.dataset.qr, ''); return; }
-    var c = e.target.closest('[data-copy]'); if (c) copyText(msgs[+c.dataset.copy].text, '답변을 복사했어요');
+    var c = e.target.closest('[data-copy]'); if (c) { copyText(msgs[+c.dataset.copy].text, '답변을 복사했어요'); return; }
+    var sv = e.target.closest('[data-saveimg]'); if (sv) { saveImages(msgs[+sv.dataset.saveimg]); return; }
+    var ed = e.target.closest('[data-editimg]'); if (ed) editFrom(msgs[+ed.dataset.editimg]);
   });
 
   // ---------- 모델 ----------
@@ -222,7 +244,7 @@
     var out = [];
     msgs.filter(function (m) { return !m.error && m.text; }).slice(-24).forEach(function (m) {
       var role = m.role === 'user' ? 'user' : 'model', last = out[out.length - 1];
-      var parts = (m.fulls || []).map(function (f) { return { inlineData: { mimeType: 'image/jpeg', data: f } }; });   // 이번에 보낸 사진만 원본으로
+      var parts = (m.fulls || []).map(function (f) { return { inlineData: { mimeType: f.m, data: f.d } }; });   // 이번에 보낸 사진만 원본으로
       parts.push({ text: m.text });
       if (last && last.role === role) last.parts = last.parts.concat(parts);     // 같은 역할이 이어지면 합침
       else out.push({ role: role, parts: parts });
@@ -232,20 +254,21 @@
   }
 
   function setBusy(b) {
-    busy = b; sendBtn.textContent = b ? '■ 멈춤' : '보내기';
+    busy = b; sendBtn.textContent = b ? '■ 멈춤' : (imgMode ? '🎨 그리기' : '보내기');
     sendBtn.className = 'btn ' + (b ? 'pause' : 'primary');
   }
 
   function send() {
     if (busy) { if (ctrl) ctrl.abort(); return; }
     var text = input.value.trim(); if (!text && !atts.length) return;
+    if (imgMode) { generateImage(text); return; }
     if (!text) text = '이 사진을 설명해 줘.';
     var key = getKey();
     if (!key) { openKey(); toast('먼저 Google API 키를 넣어 주세요'); return; }
     input.value = ''; autosize();
     msgs = msgs.filter(function (m) { return !m.error; });
     var um = { role: 'user', text: text };
-    if (atts.length) { um.thumbs = atts.map(function (a) { return a.thumb; }); um.fulls = atts.map(function (a) { return a.full; }); }
+    if (atts.length) { um.thumbs = atts.map(function (a) { return a.thumb; }); um.fulls = atts.map(function (a) { return { d: a.full, m: a.mime || 'image/jpeg' }; }); }
     atts = []; drawAtt();
     msgs.push(um);
     var bot = { role: 'model', text: '' }; msgs.push(bot);
@@ -352,6 +375,167 @@
   };
   $('aiAtt').onclick = function (e) { var b = e.target.closest('[data-rm]'); if (b) { atts.splice(+b.dataset.rm, 1); drawAtt(); } };
 
+
+  // ---------- 🎨 그림 만들기 (Gemini 이미지 모델) ----------
+  // 그림은 글 답변과 달리 한 번에 통째로 돌아오며, 보통 10~30초 걸립니다.
+  // 대화 기록에는 줄인 그림(긴 변 640px)만 저장하고, 원본은 이번에 켠 동안만 들고 있습니다.
+  function b64ToBlob(b64, mime) {
+    var bin = atob(b64), n = bin.length, u = new Uint8Array(n);
+    for (var i = 0; i < n; i++) u[i] = bin.charCodeAt(i);
+    return new Blob([u], { type: mime });
+  }
+  function thumbOf(dataUrl, max) {
+    return new Promise(function (res) {
+      var im = new Image();
+      im.onload = function () {
+        var k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k));
+        var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+        res(c.toDataURL('image/jpeg', .8));
+      };
+      im.onerror = function () { res(dataUrl); };
+      im.src = dataUrl;
+    });
+  }
+  function splitUrl(u) { var m = /^data:([^;]+);base64,(.*)$/.exec(u); return m ? { mime: m[1], data: m[2] } : null; }
+
+  function postImage(key, mk, note) {        // mk(withCfg, model) → 요청 본문
+    var sel = $('aiImgModel').value || IMG_MODELS[0][0];
+    var chain = [sel].concat(IMG_MODELS.map(function (m) { return m[0]; })).concat(IMG_BACKUP).filter(function (m, i, a) { return a.indexOf(m) === i; });
+    var i = 0, retried = false, withCfg = true;
+    function attempt() {
+      var model = chain[i];
+      return fetch(API + 'models/' + encodeURIComponent(model) + ':generateContent', {
+        method: 'POST', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify(mk(withCfg))
+      }).then(function (res) {
+        if (!res.ok) return res.json().catch(function () { return {}; }).then(function (j) { throw apiErr(res.status, j); });
+        return res.json().then(function (j) { j._model = model; return j; });
+      }).catch(function (e) {
+        if (e && e.name === 'AbortError') throw e;
+        if (e.status === 400 && withCfg && $('aiImgAr').value) { withCfg = false; return attempt(); }   // 비율 설정을 못 알아들으면 비율 없이 다시
+        var busy = e.status === 500 || e.status === 502 || e.status === 503 || e.status === 504;
+        var quota = e.status === 429 || e.status === 404;     // 모델마다 사용량이 따로라서 다른 모델로 넘어가 봄
+        if (busy && !retried) { retried = true; note('⏳ Google 서버가 바빠요. 다시 시도하는 중…'); return sleep(RETRY_MS).then(attempt); }
+        if ((busy || quota) && i < chain.length - 1) { i++; retried = false; note('⏳ 다른 모델(' + chain[i] + ')로 다시 시도하는 중…'); return sleep(500).then(attempt); }
+        throw e;
+      });
+    }
+    return attempt();
+  }
+
+  function friendlyImg(e) {
+    if (e && e.status === 429) return '그림 만들기를 쓸 수 없어요(429). 이미지 모델은 무료 키로는 사용량이 없거나 한도를 넘었을 수 있어요. Google AI Studio에서 이 키의 결제(과금) 설정과 사용량을 확인해 주세요.';
+    return friendly(e);
+  }
+
+  function generateImage(text) {
+    var key = getKey();
+    if (!key) { openKey(); toast('먼저 Google API 키를 넣어 주세요'); return; }
+    if (!text) { toast('어떤 그림을 만들지 적어 주세요'); return; }
+    input.value = ''; autosize();
+    msgs = msgs.filter(function (m) { return !m.error; });
+    var um = { role: 'user', text: '🎨 ' + text };
+    var refs = atts.slice();
+    if (refs.length) um.thumbs = refs.map(function (a) { return a.thumb; });
+    atts = []; drawAtt();
+    msgs.push(um);
+    var bot = { role: 'model', text: '' }; msgs.push(bot);
+    var bi = msgs.length - 1;
+    save(); render(); setBusy(true);
+    ctrl = new AbortController();
+
+    var note = false;
+    function setNote(t) { bot.text = t; note = true; paint(bi); }
+    setNote('🎨 그림을 그리는 중이에요… (10~30초 걸려요)');
+    var ar = $('aiImgAr').value;
+    function mk(withCfg) {
+      var parts = refs.map(function (a) { return { inlineData: { mimeType: a.mime || 'image/jpeg', data: a.full } }; });
+      parts.push({ text: text });
+      var gc = { responseModalities: ['TEXT', 'IMAGE'] };
+      if (withCfg && ar) gc.imageConfig = { aspectRatio: ar };
+      return { contents: [{ role: 'user', parts: parts }], generationConfig: gc };
+    }
+    postImage(key, mk, setNote).then(function (j) {
+      var cand = (j.candidates && j.candidates[0]) || {};
+      var parts = (cand.content && cand.content.parts) || [], texts = [], urls = [];
+      parts.forEach(function (p) {
+        if (p.thought) return;
+        var d = p.inlineData || p.inline_data;
+        if (d && d.data) urls.push('data:' + (d.mimeType || d.mime_type || 'image/png') + ';base64,' + d.data);
+        else if (p.text) texts.push(p.text);
+      });
+      if (note) { bot.text = ''; note = false; }
+      if (!urls.length) {
+        var why = (j.promptFeedback && j.promptFeedback.blockReason) || cand.finishReason || '';
+        bot.error = true;
+        bot.text = '⚠️ ' + (/SAFETY|PROHIB|BLOCK|IMAGE_OTHER/i.test(why) ? '이 그림은 만들 수 없어요. 다른 표현으로 다시 해 보세요.' : (texts.join('\n') || '그림이 만들어지지 않았어요. 설명을 바꿔 다시 해 보세요.'));
+        return;
+      }
+      bot.fullImgs = urls;
+      bot.text = texts.join('\n').trim() || '그림을 만들었어요.';
+      return Promise.all(urls.map(function (u) { return thumbOf(u, 640); })).then(function (t) { bot.images = t; });
+    }).catch(function (e) {
+      if (note) { bot.text = ''; note = false; }
+      if (e && e.name === 'AbortError') { bot.text = '(멈췄어요)'; return; }
+      bot.error = true; bot.text = '⚠️ ' + friendlyImg(e);
+    }).then(function () {
+      setBusy(false); ctrl = null; save(); render();
+    });
+  }
+
+  function saveBinary(name, mime, b64) {
+    if (isNative) {
+      var FS = plug('Filesystem'), Share = plug('Share'), nm = Date.now() + '_' + name;
+      return FS.writeFile({ path: 'ClassHub/' + nm, data: b64, directory: 'DOCUMENTS', recursive: true })
+        .then(function () { toast('문서/ClassHub 폴더에 저장했어요'); })
+        .catch(function () {
+          return FS.writeFile({ path: nm, data: b64, directory: 'CACHE' })
+            .then(function (r) { return Share.share({ title: name, files: [r.uri] }); })
+            .catch(function () { toast('저장에 실패했어요'); });
+        });
+    }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(b64ToBlob(b64, mime)); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    toast('그림을 저장했어요'); return Promise.resolve();
+  }
+  function saveImages(m) {
+    var list = (m.fullImgs && m.fullImgs.length ? m.fullImgs : m.images) || [];
+    list.forEach(function (u, i) {
+      var p = splitUrl(u); if (!p) return;
+      var ext = /jpe?g/.test(p.mime) ? 'jpg' : /webp/.test(p.mime) ? 'webp' : 'png';
+      setTimeout(function () { saveBinary('AI그림_' + new Date().toISOString().slice(0, 10) + '_' + (i + 1) + '.' + ext, p.mime, p.data); }, i * 400);
+    });
+  }
+  function editFrom(m) {                         // 만든 그림을 참고 그림으로 붙이고 그림 모드로
+    var u = (m.fullImgs && m.fullImgs[0]) || (m.images && m.images[0]); var p = u && splitUrl(u); if (!p) return;
+    thumbOf(u, 160).then(function (t) {
+      atts = [{ full: p.data, mime: p.mime, thumb: t }]; drawAtt();
+      setImgMode(true); input.focus(); toast('이 그림이 붙었어요. 어떻게 고칠지 적어 보세요');
+    });
+  }
+
+  function setImgMode(on) {
+    imgMode = on;
+    $('aiImgBtn').classList.toggle('sel', on);
+    $('aiImgBar').hidden = !on; $('aiQuick').hidden = on;
+    input.placeholder = on ? '만들고 싶은 그림을 설명하세요 (사진을 붙이면 그 사진을 고쳐 줘요)' : '질문을 입력하세요 (Enter 보내기 · Shift+Enter 줄바꿈)';
+    if (!busy) sendBtn.textContent = on ? '🎨 그리기' : '보내기';
+  }
+  $('aiImgBtn').onclick = function () { setImgMode(!imgMode); };
+  (function initImgBar() {
+    var ms = $('aiImgModel'), ar = $('aiImgAr');
+    IMG_MODELS.forEach(function (m) { var o = document.createElement('option'); o.value = m[0]; o.textContent = m[1]; ms.appendChild(o); });
+    IMG_ASPECTS.forEach(function (a) { var o = document.createElement('option'); o.value = a[0]; o.textContent = a[1]; ar.appendChild(o); });
+    ms.value = store.get(K_IMGMODEL, IMG_MODELS[0][0]); if (!ms.value) ms.value = IMG_MODELS[0][0];
+    var sa = store.get(K_IMGAR, '1:1'); ar.value = sa; if (ar.value !== sa) ar.value = '1:1';
+    ms.onchange = function () { store.set(K_IMGMODEL, ms.value); };
+    ar.onchange = function () { store.set(K_IMGAR, ar.value); };
+  })();
+
   // ---------- 내 질문 (자주 쓰는 질문 저장) ----------
   var prompts = store.get(K_PROMPTS, []); if (!Array.isArray(prompts)) prompts = [];
   function drawPrompts() {
@@ -391,6 +575,7 @@
     msgs.filter(function (m) { return !m.error && m.text; }).forEach(function (m) {
       out.push(m.role === 'user' ? '[나]' : '[AI]');
       if (m.thumbs && m.thumbs.length) out.push('(사진 ' + m.thumbs.length + '장 첨부)');
+      if (m.images && m.images.length) out.push('(AI가 만든 그림 ' + m.images.length + '장)');
       out.push(m.text, '');
     });
     return out.join('\n');
@@ -421,7 +606,7 @@
     var h = '<h1>' + esc(curTitle()) + '</h1><div class="pdate">' + esc(new Date().toLocaleString('ko-KR')) + '</div>';
     msgs.filter(function (m) { return !m.error && m.text; }).forEach(function (m) {
       h += '<div class="pm ' + (m.role === 'user' ? 'u' : 'a') + '"><b>' + (m.role === 'user' ? '나' : 'AI') + '</b>';
-      (m.thumbs || []).forEach(function (t) { h += '<img src="' + t + '" alt="">'; });
+      (m.thumbs || []).concat(m.images || []).forEach(function (t) { h += '<img src="' + t + '" alt="">'; });
       h += '<div>' + (m.role === 'user' ? esc(m.text).replace(/\n/g, '<br>') : md(m.text).replace(/<button[^>]*>QR<\/button>/g, '')) + '</div></div>';
     });
     return h;

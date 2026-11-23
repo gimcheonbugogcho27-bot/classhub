@@ -331,3 +331,17 @@
   #updateBar .pill{white-space:nowrap;flex:0 0 auto}
   #updText{flex:1 1 auto;min-width:0;line-height:1.35}
   @media (max-width:640px){ #updateBar{border-radius:22px;font-size:.88rem} }
+
+  /* 그림 만들기 */
+  .toolrow{display:flex;gap:.4rem;flex-shrink:0;flex-wrap:wrap}
+  .toolrow .pill{font-size:.9rem;padding:.35em .9em;flex:1 1 auto}
+  .toolrow .pill.sel{background:var(--accent);color:var(--on-accent);border-color:transparent}
+  .imgbar{display:flex;gap:.4rem;flex-shrink:0}
+  .imgbar[hidden]{display:none}
+  .imgbar select{flex:1;min-width:0;padding:.45em .8em;font-size:.95rem}
+  #aiQuick[hidden]{display:none}
+  .quick{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;padding-bottom:.2rem}
+  .quick .pill{white-space:nowrap;flex:0 0 auto}
+  .msg .gen{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+  .msg .gen img{max-width:100%;max-height:360px;border-radius:14px;display:block}
+  @media print{ #printArea img{max-height:90mm} }
