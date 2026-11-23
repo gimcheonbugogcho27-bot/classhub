@@ -123,10 +123,44 @@
     if (s === 400) return '요청을 처리할 수 없어요. (' + m.slice(0, 80) + ')';
     if (s === 401 || s === 403) return '이 키로는 사용할 수 없어요. 키가 맞는지, 사용 가능한 지역인지 확인해 주세요.';
     if (s === 404) return '선택한 모델을 찾을 수 없어요. 다른 모델을 골라 보세요.';
-    if (s === 429) return '요청이 너무 많거나 무료 사용량을 넘었어요. 잠시 뒤에 다시 해 보세요.';
-    if (s >= 500) return 'Google 서버가 바빠요. 잠시 뒤에 다시 해 보세요.';
+    if (s === 429) return '요청이 너무 많거나 무료 사용량을 넘었어요(429). 잠시 뒤에 다시 해 보세요.';
+    if (s >= 500) return 'Google 서버가 계속 바빠요(' + s + '). 다른 모델까지 시도했지만 안 됐어요. 1~2분 뒤에 다시 해 보세요.';
     if (e && e.name === 'TypeError') return '인터넷 연결을 확인해 주세요.';
     return m || '알 수 없는 오류가 났어요.';
+  }
+
+  // ---------- 요청: 서버가 바쁘면(500·503·429) 한 번 더 시도하고, 그래도 안 되면 다른 모델로 넘어감 ----------
+  var BACKUP_MODELS = ['gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+  var RETRY_MS = 1500;
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function openStream(key, body, note) {
+    var chain = [modelSel.value || FALLBACK_MODELS[0][0]].concat(BACKUP_MODELS).filter(function (m, i, a) { return a.indexOf(m) === i; });
+    var i = 0, retried = false;
+    function attempt() {
+      var model = chain[i];
+      return fetch(API + 'models/' + encodeURIComponent(model) + ':streamGenerateContent?alt=sse', {
+        method: 'POST', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify(body)
+      }).then(function (res) {
+        if (res.ok) { if (i > 0) toast('서버가 바빠서 ' + model + ' 모델로 답했어요'); return res; }
+        return res.json().catch(function () { return {}; }).then(function (j) { throw apiErr(res.status, j); });
+      }).catch(function (e) {
+        if (e && e.name === 'AbortError') throw e;
+        var busy = e.status === 500 || e.status === 502 || e.status === 503 || e.status === 504 || e.status === 429;
+        var missing = e.status === 404 && i > 0;
+        if (busy && !retried) {
+          retried = true; note('⏳ Google 서버가 바빠요. 다시 시도하는 중…');
+          return sleep(RETRY_MS).then(attempt);
+        }
+        if ((busy || missing) && i < chain.length - 1) {
+          i++; retried = false; note('⏳ 다른 모델(' + chain[i] + ')로 다시 시도하는 중…');
+          return sleep(500).then(attempt);
+        }
+        throw e;
+      });
+    }
+    return attempt();
   }
 
   // ---------- 보내기 ----------
@@ -164,14 +198,10 @@
       contents: contents(),
       generationConfig: { temperature: 0.7 }
     };
-    var model = modelSel.value || FALLBACK_MODELS[0][0];
 
-    fetch(API + 'models/' + encodeURIComponent(model) + ':streamGenerateContent?alt=sse', {
-      method: 'POST', signal: ctrl.signal,
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(body)
-    }).then(function (res) {
-      if (!res.ok) return res.json().catch(function () { return {}; }).then(function (j) { throw apiErr(res.status, j); });
+    var note = false;
+    function setNote(t) { bot.text = t; note = true; paint(bi); }
+    openStream(key, body, setNote).then(function (res) {
       var reader = res.body.getReader(), dec = new TextDecoder(), buf = '';
       function line(l) {
         l = l.trim(); if (l.indexOf('data:') !== 0) return;
@@ -180,7 +210,7 @@
           var o = JSON.parse(j);
           var parts = (o.candidates && o.candidates[0] && o.candidates[0].content && o.candidates[0].content.parts) || [];
           var t = parts.map(function (p) { return p.text || ''; }).join('');
-          if (t) { bot.text += t; paint(bi); }
+          if (t) { if (note) { bot.text = ''; note = false; } bot.text += t; paint(bi); }
           if (o.promptFeedback && o.promptFeedback.blockReason && !bot.text) bot.text = '이 질문에는 답할 수 없어요. 표현을 바꿔 보세요.';
         } catch (e) { /* 조각난 줄은 건너뜀 */ }
       }
@@ -194,8 +224,10 @@
       }
       return pump();
     }).then(function () {
+      if (note) { bot.text = ''; note = false; }
       if (!bot.text) bot.text = '(답변이 비어 있어요. 질문을 바꿔 보세요.)';
     }).catch(function (e) {
+      if (note) { bot.text = ''; note = false; }
       if (e && e.name === 'AbortError') { if (!bot.text) bot.text = '(멈췄어요)'; return; }
       bot.error = true; bot.text = (bot.text ? bot.text + '\n\n' : '') + '⚠️ ' + friendly(e);
     }).then(function () {
