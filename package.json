@@ -1,0 +1,32 @@
+{
+  "name": "class-hub",
+  "productName": "우리반도구함",
+  "version": "1.0.0",
+  "description": "우리반 도구함 - 시계·스톱워치·타이머·알람·QR 만들기·AI 대화",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64 --publish never"
+  },
+  "author": "우리반",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "kr.school.classhub",
+    "productName": "우리반도구함",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["electron/**", "www/**", "build/icon.png"],
+    "win": {
+      "target": [
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.png"
+    },
+    "portable": { "artifactName": "ClassHub-Portable.exe" },
+    "nsis": { "artifactName": "ClassHub-Setup.exe", "oneClick": false, "allowToChangeInstallationDirectory": true }
+  }
+}

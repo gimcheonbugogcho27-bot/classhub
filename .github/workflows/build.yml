@@ -1,0 +1,166 @@
+name: Build EXE & APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install
+
+      - name: Build exe
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassHub-windows
+          path: dist/*.exe
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Capacitor 안드로이드 프로젝트 만들기
+        run: |
+          mkdir -p apk && cd apk
+          npm init -y > /dev/null
+          npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/local-notifications@7 @capacitor/filesystem@7 @capacitor/share@7
+          cp -r ../www www
+          cp ../capacitor.config.json .
+          npx cap add android
+          npx cap sync android
+
+      - name: 화면 꺼짐 방지
+        run: |
+          cd apk/android/app/src/main
+          ACT=java/kr/school/classhub/MainActivity.java
+          cat > $ACT <<'EOF2'
+          package kr.school.classhub;
+
+          import android.os.Bundle;
+          import android.view.WindowManager;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+              }
+          }
+          EOF2
+
+      - name: 권한 (알림 · 정확한 알람)
+        run: |
+          M=apk/android/app/src/main/AndroidManifest.xml
+          sed -i 's|<application|<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />\n    <application|' $M
+          grep -n "uses-permission" $M
+
+      - name: 앱 아이콘 · 알림 소리 넣기
+        run: |
+          RES=apk/android/app/src/main/res
+          cp -r android-res/* $RES/
+          for f in ic_launcher ic_launcher_round; do
+            cat > $RES/mipmap-anydpi-v26/$f.xml <<'EOF2'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@mipmap/ic_launcher_background"/>
+              <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+          </adaptive-icon>
+          EOF2
+          done
+
+      - name: Build apk
+        run: |
+          cd apk/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../../ClassHub.apk
+
+      - name: Upload apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassHub-android
+          path: ClassHub.apk
+
+  release:
+    name: 릴리스 (고정 다운로드 주소)
+    needs: [windows, android]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 버전 읽기 (package.json)
+        id: v
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: 릴리스 만들기 / 파일 교체
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: 우리반 도구함 ${{ steps.v.outputs.tag }}
+          make_latest: true
+          overwrite_files: true
+          files: |
+            out/ClassHub-Portable.exe
+            out/ClassHub-Setup.exe
+            out/ClassHub.apk
+          body: |
+            - ClassHub-Portable.exe : 설치 없이 실행 (Windows)
+            - ClassHub-Setup.exe : 설치형 (Windows)
+            - ClassHub.apk : 안드로이드
+
+            아이폰 · 설치 없이 쓰기: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+
+  web:
+    name: 웹 버전 (아이폰 · 설치 없이)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: gh-pages 브랜치로 배포
+        run: |
+          mkdir site
+          cp -r www/* site/
+          touch site/.nojekyll
+          cd site
+          git init -q -b gh-pages
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "웹 버전 배포 ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
