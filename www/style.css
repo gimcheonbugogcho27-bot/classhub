@@ -266,3 +266,14 @@
     .seg button{font-size:.85rem;padding:.55em .1em}
     .msg{max-width:94%}
   }
+
+  /* 대화 목록 */
+  .aihead{flex-wrap:wrap}
+  #aiConvs{list-style:none;display:flex;flex-direction:column;gap:.5rem;max-height:52vh;overflow-y:auto}
+  #aiConvs li{display:flex;align-items:center;gap:.6rem;padding:.65rem .9rem;border-radius:16px;background:var(--glass);border:1px solid var(--border);cursor:pointer}
+  #aiConvs li.cur{border-color:var(--accent);box-shadow:0 0 0 2px rgba(124,156,255,.35)}
+  #aiConvs .t{flex:1;min-width:0}
+  #aiConvs .t b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #aiConvs .t small{display:block;color:var(--muted)}
+  #aiConvs .del.armed{color:var(--danger);font-weight:800;font-size:.9rem}
+  @media (max-width:640px){ .aihead select{flex:1 1 100%} .aihead .pill{flex:1} }

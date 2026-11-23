@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   var API = 'https://generativelanguage.googleapis.com/v1beta/';
-  var K_KEY = 'ai.key', K_MODEL = 'ai.model', K_SYS = 'ai.sys', K_CHAT = 'ai.chat';
+  var K_KEY = 'ai.key', K_MODEL = 'ai.model', K_SYS = 'ai.sys', K_CHAT = 'ai.chat', K_CONVS = 'ai.convs', K_CUR = 'ai.cur';
   var DEFAULT_SYS = '당신은 초등학교 선생님과 학생을 돕는 친절한 한국어 AI 도우미입니다. 쉽고 짧게 답하고, 필요하면 목록으로 정리하세요. 모르는 것은 모른다고 말하세요.';
   var FALLBACK_MODELS = [
     ['gemini-flash-latest', 'Gemini Flash (빠름 · 기본)'],
@@ -23,7 +23,25 @@
   var EMBED = String((window.APP_CONFIG && window.APP_CONFIG.geminiKey) || '').trim();
   function getKey() { return EMBED || store.get(K_KEY, ''); }
 
-  var msgs = (function () { var m = store.get(K_CHAT, []); return Array.isArray(m) ? m : []; })();
+  // ---------- 대화 목록 (여러 대화를 저장해 두고 골라서 이어가기) ----------
+  var convs = store.get(K_CONVS, []); if (!Array.isArray(convs)) convs = [];
+  var curId = store.get(K_CUR, '');
+  function titleOf(list) {
+    var u = list.filter(function (m) { return m.role === 'user'; })[0];
+    var t = u ? u.text.replace(/\s+/g, ' ').trim() : '새 대화';
+    return t.length > 26 ? t.slice(0, 26) + '…' : t;
+  }
+  (function migrate() {                       // 예전 버전의 단일 대화를 목록으로 옮김
+    var old = store.get(K_CHAT, []);
+    if (Array.isArray(old) && old.length && !convs.length) {
+      curId = 'c' + Date.now().toString(36);
+      convs.push({ id: curId, title: titleOf(old), updated: Date.now(), msgs: old });
+      store.set(K_CONVS, convs); store.set(K_CUR, curId);
+    }
+    if (store.get(K_CHAT, []).length) store.set(K_CHAT, []);
+  })();
+  function findConv(id) { return convs.filter(function (c) { return c.id === id; })[0]; }
+  var msgs = (function () { var c = findConv(curId); return c ? c.msgs.map(function (m) { return { role: m.role, text: m.text }; }) : []; })();
   var busy = false, ctrl = null;
 
   var chat = $('aiChat'), input = $('aiIn'), sendBtn = $('aiSend'), modelSel = $('aiModel');
@@ -76,7 +94,14 @@
     chat.scrollTop = chat.scrollHeight;
   }
   function save() {
-    store.set(K_CHAT, msgs.filter(function (m) { return !m.error && m.text; }).slice(-40).map(function (m) { return { role: m.role, text: m.text }; }));
+    var keep = msgs.filter(function (m) { return !m.error && m.text; }).slice(-60).map(function (m) { return { role: m.role, text: m.text }; });
+    if (!keep.length) return;
+    var c = findConv(curId);
+    if (!c) { curId = 'c' + Date.now().toString(36); c = { id: curId, title: '', updated: 0, msgs: [] }; convs.unshift(c); }
+    c.msgs = keep; c.title = titleOf(keep); c.updated = Date.now();
+    convs.sort(function (a, b) { return b.updated - a.updated; });
+    if (convs.length > 50) convs = convs.slice(0, 50);
+    store.set(K_CONVS, convs); store.set(K_CUR, curId);
   }
 
   chat.addEventListener('click', function (e) {
@@ -190,7 +215,7 @@
     msgs.push({ role: 'user', text: text });
     var bot = { role: 'model', text: '' }; msgs.push(bot);
     var bi = msgs.length - 1;
-    render(); setBusy(true);
+    save(); render(); setBusy(true);
     ctrl = new AbortController();
 
     var body = {
@@ -243,9 +268,55 @@
   function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 140) + 'px'; }
   input.addEventListener('input', autosize);
 
-  $('aiNew').onclick = function () {
-    if (ctrl) ctrl.abort();
-    msgs = []; save(); render(); toast('새 대화를 시작했어요');
+  function newChat() {
+    if (busy) { toast('답변 중이에요. ■ 멈춤을 누른 뒤에 해 주세요'); return false; }
+    save(); curId = ''; msgs = []; store.set(K_CUR, ''); render(); return true;
+  }
+  $('aiNew').onclick = function () { if (newChat()) toast('새 대화를 시작했어요'); };
+
+  // ---------- 대화 목록 창 ----------
+  var armed = '';                              // 삭제 확인을 기다리는 대화
+  function fmtDate(t) {
+    var d = new Date(t), p = function (n) { return String(n).padStart(2, '0'); };
+    return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function drawList() {
+    var ul = $('aiConvs'); ul.innerHTML = '';
+    if (!convs.length) { ul.innerHTML = '<div class="empty">저장된 대화가 아직 없어요</div>'; return; }
+    convs.forEach(function (c) {
+      var li = document.createElement('li'); li.dataset.id = c.id; if (c.id === curId) li.className = 'cur';
+      var t = document.createElement('div'); t.className = 't';
+      var b = document.createElement('b'); b.textContent = c.title || '새 대화';
+      var sm = document.createElement('small'); sm.textContent = fmtDate(c.updated) + ' · 메시지 ' + c.msgs.length + '개';
+      t.appendChild(b); t.appendChild(sm);
+      var del = document.createElement('button'); del.className = 'del'; del.dataset.del = c.id;
+      del.textContent = armed === c.id ? '삭제할까요?' : '✕'; del.title = '삭제';
+      if (armed === c.id) del.classList.add('armed');
+      li.appendChild(t); li.appendChild(del); ul.appendChild(li);
+    });
+  }
+  function openList() { armed = ''; drawList(); $('aiList').classList.add('on'); }
+  function closeList() { $('aiList').classList.remove('on'); }
+  $('aiListBtn').onclick = openList;
+  $('aiListClose').onclick = closeList;
+  $('aiList').onclick = function (e) { if (e.target.id === 'aiList') closeList(); };
+  $('aiListNew').onclick = function () { if (newChat()) { closeList(); toast('새 대화를 시작했어요'); } };
+  $('aiConvs').onclick = function (e) {
+    var d = e.target.closest('[data-del]');
+    if (d) {                                   // ✕ 한 번 = 확인, 한 번 더 = 삭제
+      var id = d.dataset.del;
+      if (armed !== id) { armed = id; drawList(); return; }
+      convs = convs.filter(function (c) { return c.id !== id; });
+      store.set(K_CONVS, convs); armed = '';
+      if (id === curId) { curId = ''; msgs = []; store.set(K_CUR, ''); render(); }
+      drawList(); return;
+    }
+    var li = e.target.closest('li[data-id]'); if (!li) return;
+    if (busy) { toast('답변 중이에요. ■ 멈춤을 누른 뒤에 해 주세요'); return; }
+    var c = findConv(li.dataset.id); if (!c) return;
+    save(); curId = c.id; store.set(K_CUR, curId);
+    msgs = c.msgs.map(function (m) { return { role: m.role, text: m.text }; });
+    render(); closeList();
   };
 
   // 빠른 질문 칩

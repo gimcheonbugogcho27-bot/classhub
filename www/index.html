@@ -153,7 +153,8 @@
   <section id="ai">
     <div class="panel aihead">
       <select id="aiModel" class="field" title="AI 모델"></select>
-      <button class="pill" id="aiNew" title="대화 지우고 새로 시작">🗑 새 대화</button>
+      <button class="pill" id="aiListBtn" title="저장된 대화 목록">📂 대화목록</button>
+      <button class="pill" id="aiNew" title="새 대화 시작">➕ 새 대화</button>
       <button class="pill" id="aiKeyBtn" title="Google API 키 설정">🔑 API 키</button>
     </div>
     <button class="panel aihint" id="aiHint" hidden>🔑 처음 한 번, Google AI Studio에서 받은 API 키를 넣어 주세요 (누르면 열려요)</button>
@@ -218,6 +219,14 @@
       <button class="btn ghost" id="qNo">취소</button>
       <button class="btn primary" id="qYes">삭제</button>
     </div>
+  </div>
+</div>
+
+<div id="aiList" class="overlay">
+  <div class="card glass setcard">
+    <div class="sethead"><b>대화 목록</b><button class="del" id="aiListClose" title="닫기">✕</button></div>
+    <button class="btn primary" id="aiListNew">➕ 새 대화 시작</button>
+    <ul id="aiConvs"></ul>
   </div>
 </div>
 
