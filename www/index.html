@@ -155,12 +155,18 @@
       <select id="aiModel" class="field" title="AI 모델"></select>
       <button class="pill" id="aiListBtn" title="저장된 대화 목록">📂 대화목록</button>
       <button class="pill" id="aiNew" title="새 대화 시작">➕ 새 대화</button>
+      <button class="pill ic" id="aiExport" title="이 대화를 파일로 저장">💾</button>
+      <button class="pill ic" id="aiPrint" title="이 대화 인쇄 (A4)">🖨</button>
       <button class="pill" id="aiKeyBtn" title="Google API 키 설정">🔑 API 키</button>
     </div>
     <button class="panel aihint" id="aiHint" hidden>🔑 처음 한 번, Google AI Studio에서 받은 API 키를 넣어 주세요 (누르면 열려요)</button>
     <div class="panel card glass chatbox" id="aiChat"></div>
     <div class="panel row quick" id="aiQuick"></div>
+    <div class="panel attrow" id="aiAtt" hidden></div>
     <div class="panel aiinput">
+      <button class="pill ic round" id="aiPhoto" title="사진 붙이기 (최대 3장)">📷</button>
+      <button class="pill ic round" id="aiPromptBtn" title="내 질문 (자주 쓰는 질문)">⭐</button>
+      <input type="file" id="aiFile" accept="image/*" multiple hidden>
       <textarea id="aiIn" class="field" rows="1" placeholder="질문을 입력하세요 (Enter 보내기 · Shift+Enter 줄바꿈)"></textarea>
       <button class="btn primary" id="aiSend">보내기</button>
     </div>
@@ -226,7 +232,18 @@
   <div class="card glass setcard">
     <div class="sethead"><b>대화 목록</b><button class="del" id="aiListClose" title="닫기">✕</button></div>
     <button class="btn primary" id="aiListNew">➕ 새 대화 시작</button>
+    <input class="field" id="aiSearch" type="search" placeholder="🔍 제목·내용으로 찾기" autocomplete="off">
     <ul id="aiConvs"></ul>
+  </div>
+</div>
+
+<div id="aiPrompts" class="overlay">
+  <div class="card glass setcard">
+    <div class="sethead"><b>⭐ 내 질문</b><button class="del" id="aiPromptClose" title="닫기">✕</button></div>
+    <textarea class="field" id="aiPromptNew" rows="3" placeholder="자주 쓰는 질문을 적고 [저장]을 누르세요 (입력창에 쓰던 내용이 들어와 있어요)"></textarea>
+    <button class="btn primary" id="aiPromptSave">저장</button>
+    <div class="setnote">저장된 질문을 누르면 입력창에 들어가요.</div>
+    <ul id="aiPromptList"></ul>
   </div>
 </div>
 
@@ -248,6 +265,7 @@
   </div>
 </div>
 
+<div id="printArea"></div>
 <div id="toast" class="toast"></div>
 
 <script src="qrcode-lib.js"></script>

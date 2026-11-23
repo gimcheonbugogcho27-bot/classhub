@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   var API = 'https://generativelanguage.googleapis.com/v1beta/';
-  var K_KEY = 'ai.key', K_MODEL = 'ai.model', K_SYS = 'ai.sys', K_CHAT = 'ai.chat', K_CONVS = 'ai.convs', K_CUR = 'ai.cur';
+  var K_KEY = 'ai.key', K_MODEL = 'ai.model', K_SYS = 'ai.sys', K_CHAT = 'ai.chat', K_CONVS = 'ai.convs', K_CUR = 'ai.cur', K_PROMPTS = 'ai.prompts';
   var DEFAULT_SYS = '당신은 초등학교 선생님과 학생을 돕는 친절한 한국어 AI 도우미입니다. 쉽고 짧게 답하고, 필요하면 목록으로 정리하세요. 모르는 것은 모른다고 말하세요.';
   var FALLBACK_MODELS = [
     ['gemini-flash-latest', 'Gemini Flash (빠름 · 기본)'],
@@ -41,7 +41,8 @@
     if (store.get(K_CHAT, []).length) store.set(K_CHAT, []);
   })();
   function findConv(id) { return convs.filter(function (c) { return c.id === id; })[0]; }
-  var msgs = (function () { var c = findConv(curId); return c ? c.msgs.map(function (m) { return { role: m.role, text: m.text }; }) : []; })();
+  function cp(m) { var o = { role: m.role, text: m.text }; if (m.thumbs && m.thumbs.length) o.thumbs = m.thumbs; return o; }   // 저장용 사본 (사진은 작은 썸네일만)
+  var msgs = (function () { var c = findConv(curId); return c ? c.msgs.map(cp) : []; })();
   var busy = false, ctrl = null;
 
   var chat = $('aiChat'), input = $('aiIn'), sendBtn = $('aiSend'), modelSel = $('aiModel');
@@ -69,6 +70,11 @@
     d.dataset.i = idx;
     var body = document.createElement('div'); body.className = 'body';
     if (m.role === 'user') body.textContent = m.text; else body.innerHTML = md(m.text || '…');
+    if (m.thumbs && m.thumbs.length) {
+      var im = document.createElement('div'); im.className = 'imgs';
+      m.thumbs.forEach(function (t) { var i = document.createElement('img'); i.src = t; i.alt = '첨부 사진'; im.appendChild(i); });
+      body.insertBefore(im, body.firstChild);
+    }
     d.appendChild(body);
     if (m.role !== 'user' && m.text && !m.error) {
       var act = document.createElement('div'); act.className = 'act';
@@ -94,11 +100,11 @@
     chat.scrollTop = chat.scrollHeight;
   }
   function save() {
-    var keep = msgs.filter(function (m) { return !m.error && m.text; }).slice(-60).map(function (m) { return { role: m.role, text: m.text }; });
+    var keep = msgs.filter(function (m) { return !m.error && m.text; }).slice(-60).map(cp);
     if (!keep.length) return;
     var c = findConv(curId);
     if (!c) { curId = 'c' + Date.now().toString(36); c = { id: curId, title: '', updated: 0, msgs: [] }; convs.unshift(c); }
-    c.msgs = keep; c.title = titleOf(keep); c.updated = Date.now();
+    c.msgs = keep; if (!c.custom) c.title = titleOf(keep); c.updated = Date.now();
     convs.sort(function (a, b) { return b.updated - a.updated; });
     if (convs.length > 50) convs = convs.slice(0, 50);
     store.set(K_CONVS, convs); store.set(K_CUR, curId);
@@ -193,8 +199,10 @@
     var out = [];
     msgs.filter(function (m) { return !m.error && m.text; }).slice(-24).forEach(function (m) {
       var role = m.role === 'user' ? 'user' : 'model', last = out[out.length - 1];
-      if (last && last.role === role) last.parts[0].text += '\n' + m.text;      // 같은 역할이 이어지면 합침
-      else out.push({ role: role, parts: [{ text: m.text }] });
+      var parts = (m.fulls || []).map(function (f) { return { inlineData: { mimeType: 'image/jpeg', data: f } }; });   // 이번에 보낸 사진만 원본으로
+      parts.push({ text: m.text });
+      if (last && last.role === role) last.parts = last.parts.concat(parts);     // 같은 역할이 이어지면 합침
+      else out.push({ role: role, parts: parts });
     });
     while (out.length && out[0].role !== 'user') out.shift();
     return out;
@@ -207,12 +215,16 @@
 
   function send() {
     if (busy) { if (ctrl) ctrl.abort(); return; }
-    var text = input.value.trim(); if (!text) return;
+    var text = input.value.trim(); if (!text && !atts.length) return;
+    if (!text) text = '이 사진을 설명해 줘.';
     var key = getKey();
     if (!key) { openKey(); toast('먼저 Google API 키를 넣어 주세요'); return; }
     input.value = ''; autosize();
     msgs = msgs.filter(function (m) { return !m.error; });
-    msgs.push({ role: 'user', text: text });
+    var um = { role: 'user', text: text };
+    if (atts.length) { um.thumbs = atts.map(function (a) { return a.thumb; }); um.fulls = atts.map(function (a) { return a.full; }); }
+    atts = []; drawAtt();
+    msgs.push(um);
     var bot = { role: 'model', text: '' }; msgs.push(bot);
     var bi = msgs.length - 1;
     save(); render(); setBusy(true);
@@ -274,38 +286,202 @@
   }
   $('aiNew').onclick = function () { if (newChat()) toast('새 대화를 시작했어요'); };
 
+
+  // ---------- 사진 첨부 (최대 3장, 긴 변 1280px JPEG 로 줄여서 전송) ----------
+  var atts = [];
+  function drawAtt() {
+    var box = $('aiAtt'); box.innerHTML = ''; box.hidden = !atts.length;
+    atts.forEach(function (a, i) {
+      var w = document.createElement('div'); w.className = 'att';
+      var im = document.createElement('img'); im.src = a.thumb; im.alt = '첨부 사진';
+      var x = document.createElement('button'); x.textContent = '✕'; x.title = '빼기'; x.dataset.rm = i;
+      w.appendChild(im); w.appendChild(x); box.appendChild(w);
+    });
+  }
+  function shrink(file) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        function jpg(max, q) {
+          var k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+          var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+          return c.toDataURL('image/jpeg', q);
+        }
+        var full = jpg(1280, .85), thumb = jpg(160, .6);
+        URL.revokeObjectURL(url);
+        res({ full: full.split(',')[1], thumb: thumb });
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('열 수 없는 사진')); };
+      img.src = url;
+    });
+  }
+  $('aiPhoto').onclick = function () {
+    if (atts.length >= 3) { toast('사진은 한 번에 3장까지 보낼 수 있어요'); return; }
+    $('aiFile').click();
+  };
+  $('aiFile').onchange = function () {
+    var files = Array.prototype.slice.call(this.files || []).slice(0, 3 - atts.length); this.value = '';
+    Promise.all(files.map(function (f) { return shrink(f).catch(function () { return null; }); })).then(function (r) {
+      var ok = r.filter(Boolean); atts = atts.concat(ok); drawAtt();
+      if (ok.length < files.length) toast('열 수 없는 사진이 있어요 (JPG·PNG 권장)');
+    });
+  };
+  $('aiAtt').onclick = function (e) { var b = e.target.closest('[data-rm]'); if (b) { atts.splice(+b.dataset.rm, 1); drawAtt(); } };
+
+  // ---------- 내 질문 (자주 쓰는 질문 저장) ----------
+  var prompts = store.get(K_PROMPTS, []); if (!Array.isArray(prompts)) prompts = [];
+  function drawPrompts() {
+    var ul = $('aiPromptList'); ul.innerHTML = '';
+    if (!prompts.length) { ul.innerHTML = '<div class="empty">저장된 질문이 아직 없어요</div>'; return; }
+    prompts.forEach(function (p) {
+      var li = document.createElement('li'); li.dataset.id = p.id;
+      var t = document.createElement('div'); t.className = 't'; t.textContent = p.text;
+      var del = document.createElement('button'); del.className = 'del'; del.dataset.del = p.id; del.textContent = '✕'; del.title = '삭제';
+      li.appendChild(t); li.appendChild(del); ul.appendChild(li);
+    });
+  }
+  function openPrompts() { $('aiPromptNew').value = input.value; drawPrompts(); $('aiPrompts').classList.add('on'); }
+  function closePrompts() { $('aiPrompts').classList.remove('on'); }
+  $('aiPromptBtn').onclick = openPrompts;
+  $('aiPromptClose').onclick = closePrompts;
+  $('aiPrompts').onclick = function (e) { if (e.target.id === 'aiPrompts') closePrompts(); };
+  $('aiPromptSave').onclick = function () {
+    var t = $('aiPromptNew').value.trim(); if (!t) { toast('저장할 질문을 적어 주세요'); return; }
+    prompts = prompts.filter(function (p) { return p.text !== t; });
+    prompts.unshift({ id: 'p' + Date.now().toString(36), text: t });
+    prompts = prompts.slice(0, 50); store.set(K_PROMPTS, prompts);
+    $('aiPromptNew').value = ''; drawPrompts(); toast('질문을 저장했어요');
+  };
+  $('aiPromptList').onclick = function (e) {
+    var d = e.target.closest('[data-del]');
+    if (d) { prompts = prompts.filter(function (p) { return p.id !== d.dataset.del; }); store.set(K_PROMPTS, prompts); drawPrompts(); return; }
+    var li = e.target.closest('li[data-id]'); if (!li) return;
+    var p = prompts.filter(function (x) { return x.id === li.dataset.id; })[0]; if (!p) return;
+    input.value = p.text; autosize(); closePrompts(); input.focus();
+  };
+
+  // ---------- 대화 내보내기 · 인쇄 ----------
+  function curTitle() { var c = findConv(curId); return (c && c.title) || titleOf(msgs); }
+  function transcript() {
+    var out = [curTitle(), new Date().toLocaleString('ko-KR'), ''];
+    msgs.filter(function (m) { return !m.error && m.text; }).forEach(function (m) {
+      out.push(m.role === 'user' ? '[나]' : '[AI]');
+      if (m.thumbs && m.thumbs.length) out.push('(사진 ' + m.thumbs.length + '장 첨부)');
+      out.push(m.text, '');
+    });
+    return out.join('\n');
+  }
+  function fileBase() { return ('AI대화_' + curTitle()).replace(/[\\/:*?"<>|\s…]+/g, '_').slice(0, 40).replace(/[._]+$/, ''); }
+  function saveFile(name, mime, text) {
+    if (isNative) {
+      var FS = plug('Filesystem'), Share = plug('Share');
+      var nm = Date.now() + '_' + name;
+      return FS.writeFile({ path: 'ClassHub/' + nm, data: text, directory: 'DOCUMENTS', encoding: 'utf8', recursive: true })
+        .then(function () { toast('문서/ClassHub 폴더에 저장했어요'); })
+        .catch(function () {
+          return FS.writeFile({ path: nm, data: text, directory: 'CACHE', encoding: 'utf8' })
+            .then(function (r) { return Share.share({ title: name, files: [r.uri] }); })
+            .catch(function () { toast('저장에 실패했어요'); });
+        });
+    }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + text], { type: mime + ';charset=utf-8' })); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    toast('파일로 저장했어요'); return Promise.resolve();
+  }
+  function hasChat() { if (!msgs.some(function (m) { return !m.error && m.text; })) { toast('저장할 대화가 아직 없어요'); return false; } return true; }
+  $('aiExport').onclick = function () { if (hasChat()) saveFile(fileBase() + '.txt', 'text/plain', transcript()); };
+
+  function printHtml() {
+    var h = '<h1>' + esc(curTitle()) + '</h1><div class="pdate">' + esc(new Date().toLocaleString('ko-KR')) + '</div>';
+    msgs.filter(function (m) { return !m.error && m.text; }).forEach(function (m) {
+      h += '<div class="pm ' + (m.role === 'user' ? 'u' : 'a') + '"><b>' + (m.role === 'user' ? '나' : 'AI') + '</b>';
+      (m.thumbs || []).forEach(function (t) { h += '<img src="' + t + '" alt="">'; });
+      h += '<div>' + (m.role === 'user' ? esc(m.text).replace(/\n/g, '<br>') : md(m.text).replace(/<button[^>]*>QR<\/button>/g, '')) + '</div></div>';
+    });
+    return h;
+  }
+  $('aiPrint').onclick = function () {
+    if (!hasChat()) return;
+    if (isNative) {          // 안드로이드 앱에는 인쇄 창이 없어서, 인쇄용 HTML 파일로 저장/공유
+      saveFile(fileBase() + '.html', 'text/html', '<!DOCTYPE html><meta charset="utf-8"><title>' + esc(curTitle()) + '</title><style>body{font-family:sans-serif;max-width:700px;margin:auto;line-height:1.6}.pm{margin:14px 0;padding:10px 14px;border:1px solid #ccc;border-radius:10px}.pm img{max-height:120px;margin:4px}</style>' + printHtml());
+      return;
+    }
+    $('printArea').innerHTML = printHtml();
+    window.print();
+  };
+  window.addEventListener('afterprint', function () { $('printArea').innerHTML = ''; });
+
   // ---------- 대화 목록 창 ----------
   var armed = '';                              // 삭제 확인을 기다리는 대화
   function fmtDate(t) {
     var d = new Date(t), p = function (n) { return String(n).padStart(2, '0'); };
     return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
+  var renaming = '';                           // 제목 수정 중인 대화
+  function snippet(c, q) {                     // 검색어가 들어 있는 메시지 한 토막
+    for (var i = 0; i < c.msgs.length; i++) {
+      var t = c.msgs[i].text, k = t.toLowerCase().indexOf(q);
+      if (k >= 0) { var a = Math.max(0, k - 12); return (a ? '…' : '') + t.slice(a, k + q.length + 24).replace(/[*`#]/g, '').replace(/\s+/g, ' ') + '…'; }
+    }
+    return '';
+  }
   function drawList() {
     var ul = $('aiConvs'); ul.innerHTML = '';
-    if (!convs.length) { ul.innerHTML = '<div class="empty">저장된 대화가 아직 없어요</div>'; return; }
-    convs.forEach(function (c) {
+    var q = $('aiSearch').value.trim().toLowerCase();
+    var list = !q ? convs : convs.filter(function (c) {
+      return (c.title || '').toLowerCase().indexOf(q) >= 0 || c.msgs.some(function (m) { return m.text.toLowerCase().indexOf(q) >= 0; });
+    });
+    if (!list.length) { ul.innerHTML = '<div class="empty">' + (q ? '찾는 대화가 없어요' : '저장된 대화가 아직 없어요') + '</div>'; return; }
+    list.forEach(function (c) {
       var li = document.createElement('li'); li.dataset.id = c.id; if (c.id === curId) li.className = 'cur';
       var t = document.createElement('div'); t.className = 't';
-      var b = document.createElement('b'); b.textContent = c.title || '새 대화';
-      var sm = document.createElement('small'); sm.textContent = fmtDate(c.updated) + ' · 메시지 ' + c.msgs.length + '개';
-      t.appendChild(b); t.appendChild(sm);
+      if (renaming === c.id) {
+        var inp = document.createElement('input'); inp.className = 'field ren'; inp.value = c.title || ''; inp.maxLength = 40; inp.placeholder = '대화 제목';
+        t.appendChild(inp);
+      } else {
+        var b = document.createElement('b'); b.textContent = c.title || '새 대화';
+        var sm = document.createElement('small');
+        sm.textContent = (q && snippet(c, q)) || (fmtDate(c.updated) + ' · 메시지 ' + c.msgs.length + '개');
+        t.appendChild(b); t.appendChild(sm);
+      }
+      var ed = document.createElement('button'); ed.className = 'del edit';
+      if (renaming === c.id) { ed.dataset.renOk = c.id; ed.textContent = '✔'; ed.title = '제목 저장'; }
+      else { ed.dataset.ren = c.id; ed.textContent = '✎'; ed.title = '제목 고치기'; }
       var del = document.createElement('button'); del.className = 'del'; del.dataset.del = c.id;
       del.textContent = armed === c.id ? '삭제할까요?' : '✕'; del.title = '삭제';
       if (armed === c.id) del.classList.add('armed');
-      li.appendChild(t); li.appendChild(del); ul.appendChild(li);
+      li.appendChild(t); li.appendChild(ed); li.appendChild(del); ul.appendChild(li);
+      if (renaming === c.id) setTimeout(function () { inp.focus(); inp.select(); }, 0);
     });
   }
-  function openList() { armed = ''; drawList(); $('aiList').classList.add('on'); }
+  function commitRename(id) {
+    var c = findConv(id), inp = $('aiConvs').querySelector('.ren');
+    if (c && inp) { var v = inp.value.trim(); c.custom = !!v; c.title = v || titleOf(c.msgs); store.set(K_CONVS, convs); }
+    renaming = ''; drawList();
+  }
+  $('aiSearch').addEventListener('input', drawList);
+  $('aiConvs').addEventListener('keydown', function (e) {
+    if (!e.target.classList.contains('ren')) return;
+    if (e.key === 'Enter' && !isComposing(e)) { e.preventDefault(); commitRename(renaming); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); renaming = ''; drawList(); }
+  });
+  function openList() { armed = ''; renaming = ''; $('aiSearch').value = ''; drawList(); $('aiList').classList.add('on'); }
   function closeList() { $('aiList').classList.remove('on'); }
   $('aiListBtn').onclick = openList;
   $('aiListClose').onclick = closeList;
   $('aiList').onclick = function (e) { if (e.target.id === 'aiList') closeList(); };
   $('aiListNew').onclick = function () { if (newChat()) { closeList(); toast('새 대화를 시작했어요'); } };
   $('aiConvs').onclick = function (e) {
+    if (e.target.closest('.ren')) return;
+    var ro = e.target.closest('[data-ren-ok]'); if (ro) { commitRename(ro.dataset.renOk); return; }
+    var rn = e.target.closest('[data-ren]'); if (rn) { renaming = rn.dataset.ren; armed = ''; drawList(); return; }
     var d = e.target.closest('[data-del]');
     if (d) {                                   // ✕ 한 번 = 확인, 한 번 더 = 삭제
       var id = d.dataset.del;
-      if (armed !== id) { armed = id; drawList(); return; }
+      if (armed !== id) { armed = id; renaming = ''; drawList(); return; }
       convs = convs.filter(function (c) { return c.id !== id; });
       store.set(K_CONVS, convs); armed = '';
       if (id === curId) { curId = ''; msgs = []; store.set(K_CUR, ''); render(); }
@@ -315,7 +491,7 @@
     if (busy) { toast('답변 중이에요. ■ 멈춤을 누른 뒤에 해 주세요'); return; }
     var c = findConv(li.dataset.id); if (!c) return;
     save(); curId = c.id; store.set(K_CUR, curId);
-    msgs = c.msgs.map(function (m) { return { role: m.role, text: m.text }; });
+    msgs = c.msgs.map(cp);
     render(); closeList();
   };
 
