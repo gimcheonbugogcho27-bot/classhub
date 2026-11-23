@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com; img-src 'self' data: blob:; media-src 'self' data: blob:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com https://api.github.com; img-src 'self' data: blob:; media-src 'self' data: blob:;">
 <title>우리반 도구함</title>
 <link rel="icon" href="web-icons/icon-192.png">
 <link rel="apple-touch-icon" href="web-icons/icon-180.png">
@@ -20,6 +20,8 @@
 <div id="miniBar">
   <button class="icon glass" id="miniExit" title="크게 보기 (M)">⤢</button>
 </div>
+
+<div id="updateBar" hidden><span id="updText">🔔 새 버전이 나왔어요</span><button class="pill sel" id="updGo">받기</button><button class="pill" id="updLater">나중에</button></div>
 
 <header>
   <div class="seg glass" id="tabs">
@@ -273,5 +275,6 @@
 <script src="qr.js"></script>
 <script src="config.js"></script>
 <script src="ai.js"></script>
+<script src="update.js"></script>
 </body>
 </html>

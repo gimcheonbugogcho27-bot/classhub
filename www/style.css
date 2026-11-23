@@ -309,3 +309,25 @@
     #printArea img{max-height:36mm;margin:2pt}
     #printArea pre{white-space:pre-wrap;background:#f4f4f4;padding:4pt;border-radius:4pt}
   }
+
+  /* AI 답변 표 */
+  .msg .tbl{max-width:100%;overflow-x:auto;margin:.4em 0}
+  .msg table{border-collapse:collapse;font-size:.92em}
+  .msg th,.msg td{border:1px solid var(--border);padding:.35em .7em;vertical-align:top}
+  .msg th{background:rgba(127,127,127,.22);font-weight:800}
+  .msg hr{border:0;border-top:1px solid var(--border);margin:.6em 0}
+  @media print{
+    #printArea table{border-collapse:collapse;margin:4pt 0;page-break-inside:avoid}
+    #printArea th,#printArea td{border:1px solid #777;padding:3pt 6pt}
+    #printArea th{background:#eee}
+  }
+  /* 새 버전 알림 */
+  #updateBar{align-self:center;display:flex;align-items:center;gap:.6rem;margin:8px 1rem 0;position:relative;z-index:45;
+             padding:.45rem .6rem .45rem 1.1rem;border-radius:999px;max-width:94vw;font-weight:700;font-size:.95rem;
+             background:var(--glass-strong);border:1px solid var(--accent);box-shadow:var(--shadow)}
+  #updateBar[hidden]{display:none}
+  #updateBar .pill{font-size:.9rem;padding:.3em .9em}
+  body.mini #updateBar{display:none!important}
+  #updateBar .pill{white-space:nowrap;flex:0 0 auto}
+  #updText{flex:1 1 auto;min-width:0;line-height:1.35}
+  @media (max-width:640px){ #updateBar{border-radius:22px;font-size:.88rem} }

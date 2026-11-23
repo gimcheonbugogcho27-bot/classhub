@@ -47,11 +47,33 @@
 
   var chat = $('aiChat'), input = $('aiIn'), sendBtn = $('aiSend'), modelSel = $('aiModel');
 
+  // ---------- 표 (| a | b | 줄 + |---|---| 줄) 을 HTML 표로 ----------
+  function tables(h) {
+    var L = h.split('\n'), out = [], i = 0;
+    var isRow = function (l) { return l.indexOf('|') >= 0 && l.trim().length > 2; };
+    var isSep = function (l) { return l.indexOf('|') >= 0 && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l); };
+    var cells = function (l) { return l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); }); };
+    while (i < L.length) {
+      if (isRow(L[i]) && i + 1 < L.length && isSep(L[i + 1])) {
+        var head = cells(L[i]), al = cells(L[i + 1]).map(function (c) { return /^:-*:$/.test(c) ? 'center' : /-:$/.test(c) ? 'right' : 'left'; });
+        var j = i + 2, rows = [];
+        while (j < L.length && isRow(L[j]) && !isSep(L[j])) { rows.push(cells(L[j])); j++; }
+        var st = function (k) { return ' style="text-align:' + (al[k] || 'left') + '"'; };
+        out.push('<div class="tbl"><table><thead><tr>' + head.map(function (c, k) { return '<th' + st(k) + '>' + c + '</th>'; }).join('') + '</tr></thead><tbody>' +
+          rows.map(function (r) { return '<tr>' + head.map(function (_, k) { return '<td' + st(k) + '>' + (r[k] || '') + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>');
+        i = j;
+      } else { out.push(L[i]); i++; }
+    }
+    return out.join('\n');
+  }
+
   // ---------- 글 꾸미기 (안전하게: 먼저 이스케이프) ----------
   function md(text) {
     var blocks = [];
     var h = esc(text).replace(/```[^\n`]*\n?([\s\S]*?)```/g, function (m, c) { blocks.push(c.replace(/\n$/, '')); return '\u0000' + (blocks.length - 1) + '\u0000'; });
+    h = tables(h);
     h = h.replace(/`([^`\n]+)`/g, '<code>$1</code>')
+         .replace(/^\s*(?:-{3,}|\*{3,})\s*$/gm, '<hr>')
          .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
          .replace(/^#{1,6}\s*(.+)$/gm, '<b>$1</b>')
          .replace(/^\s*[*-]\s+(.+)$/gm, '• $1')
@@ -61,6 +83,7 @@
            return '<span class="lnk">' + clean + '</span><button class="mini-qr" data-qr="' + clean + '" title="이 주소로 QR 만들기">QR</button>' + tail;
          })
          .replace(/\n/g, '<br>');
+    h = h.replace(/<br>(<div class="tbl">)/g, '$1').replace(/(<\/div>)<br>/g, '$1').replace(/<hr><br>/g, '<hr>');
     return h.replace(/\u0000(\d+)\u0000/g, function (m, i) { return '<pre><code>' + blocks[+i] + '</code></pre>'; });
   }
 
@@ -406,7 +429,7 @@
   $('aiPrint').onclick = function () {
     if (!hasChat()) return;
     if (isNative) {          // 안드로이드 앱에는 인쇄 창이 없어서, 인쇄용 HTML 파일로 저장/공유
-      saveFile(fileBase() + '.html', 'text/html', '<!DOCTYPE html><meta charset="utf-8"><title>' + esc(curTitle()) + '</title><style>body{font-family:sans-serif;max-width:700px;margin:auto;line-height:1.6}.pm{margin:14px 0;padding:10px 14px;border:1px solid #ccc;border-radius:10px}.pm img{max-height:120px;margin:4px}</style>' + printHtml());
+      saveFile(fileBase() + '.html', 'text/html', '<!DOCTYPE html><meta charset="utf-8"><title>' + esc(curTitle()) + '</title><style>table{border-collapse:collapse;margin:6px 0}th,td{border:1px solid #999;padding:4px 8px}th{background:#eee}body{font-family:sans-serif;max-width:700px;margin:auto;line-height:1.6}.pm{margin:14px 0;padding:10px 14px;border:1px solid #ccc;border-radius:10px}.pm img{max-height:120px;margin:4px}</style>' + printHtml());
       return;
     }
     $('printArea').innerHTML = printHtml();

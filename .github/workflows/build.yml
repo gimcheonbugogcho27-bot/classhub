@@ -23,8 +23,9 @@ jobs:
         shell: bash
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BUILD_NO: ${{ github.run_number }}
         run: |
-          node -e "require('fs').writeFileSync('www/config.js','window.APP_CONFIG = { geminiKey: '+JSON.stringify(process.env.GEMINI_API_KEY||'')+' };\n')"
+          node -e "const c={geminiKey:process.env.GEMINI_API_KEY||'',build:+process.env.BUILD_NO||0,version:require('./package.json').version};require('fs').writeFileSync('www/config.js','window.APP_CONFIG = '+JSON.stringify(c)+';\n')"
 
       - name: Install
         run: npm install
@@ -59,8 +60,9 @@ jobs:
         shell: bash
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BUILD_NO: ${{ github.run_number }}
         run: |
-          node -e "require('fs').writeFileSync('www/config.js','window.APP_CONFIG = { geminiKey: '+JSON.stringify(process.env.GEMINI_API_KEY||'')+' };\n')"
+          node -e "const c={geminiKey:process.env.GEMINI_API_KEY||'',build:+process.env.BUILD_NO||0,version:require('./package.json').version};require('fs').writeFileSync('www/config.js','window.APP_CONFIG = '+JSON.stringify(c)+';\n')"
 
       - name: Capacitor 안드로이드 프로젝트 만들기
         run: |
@@ -192,7 +194,7 @@ jobs:
         with:
           tag_name: ${{ steps.v.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: 우리반 도구함 ${{ steps.v.outputs.tag }}
+          name: 우리반 도구함 ${{ steps.v.outputs.tag }} (빌드 ${{ github.run_number }})
           make_latest: true
           overwrite_files: true
           files: |
@@ -217,8 +219,9 @@ jobs:
         shell: bash
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BUILD_NO: ${{ github.run_number }}
         run: |
-          node -e "require('fs').writeFileSync('www/config.js','window.APP_CONFIG = { geminiKey: '+JSON.stringify(process.env.GEMINI_API_KEY||'')+' };\n')"
+          node -e "const c={geminiKey:process.env.GEMINI_API_KEY||'',build:+process.env.BUILD_NO||0,version:require('./package.json').version};require('fs').writeFileSync('www/config.js','window.APP_CONFIG = '+JSON.stringify(c)+';\n')"
 
       - name: gh-pages 브랜치로 배포
         run: |
