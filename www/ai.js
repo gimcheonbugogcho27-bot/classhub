@@ -4,7 +4,7 @@
 (function () {
   'use strict';
   var API = 'https://generativelanguage.googleapis.com/v1beta/';
-  var K_KEY = 'ai.key', K_MODEL = 'ai.model', K_SYS = 'ai.sys', K_CHAT = 'ai.chat', K_CONVS = 'ai.convs', K_CUR = 'ai.cur', K_PROMPTS = 'ai.prompts', K_IMGMODEL = 'ai.imgmodel', K_IMGAR = 'ai.imgar';
+  var K_KEY = 'ai.key', K_MODEL = 'ai.model', K_SYS = 'ai.sys', K_CHAT = 'ai.chat', K_CONVS = 'ai.convs', K_CUR = 'ai.cur', K_PROMPTS = 'ai.prompts', K_IMGMODEL = 'ai.imgmodel', K_IMGAR = 'ai.imgar', K_SEARCH = 'ai.search';
   var DEFAULT_SYS = '당신은 초등학교 선생님과 학생을 돕는 친절한 한국어 AI 도우미입니다. 쉽고 짧게 답하고, 필요하면 목록으로 정리하세요. 모르는 것은 모른다고 말하세요.';
   var FALLBACK_MODELS = [
     ['gemini-flash-latest', 'Gemini Flash (빠름 · 기본)'],
@@ -49,7 +49,7 @@
     if (store.get(K_CHAT, []).length) store.set(K_CHAT, []);
   })();
   function findConv(id) { return convs.filter(function (c) { return c.id === id; })[0]; }
-  function cp(m) { var o = { role: m.role, text: m.text }; if (m.thumbs && m.thumbs.length) o.thumbs = m.thumbs; if (m.images && m.images.length) o.images = m.images; return o; }   // 저장용 사본 (사진은 작은 썸네일만)
+  function cp(m) { var o = { role: m.role, text: m.text }; if (m.thumbs && m.thumbs.length) o.thumbs = m.thumbs; if (m.images && m.images.length) o.images = m.images; if (m.sources && m.sources.length) o.sources = m.sources; return o; }   // 저장용 사본 (사진은 작은 썸네일만)
   var msgs = (function () { var c = findConv(curId); return c ? c.msgs.map(cp) : []; })();
   var busy = false, ctrl = null, imgMode = false;
 
@@ -105,6 +105,11 @@
       var im = document.createElement('div'); im.className = 'imgs';
       m.thumbs.forEach(function (t) { var i = document.createElement('img'); i.src = t; i.alt = '첨부 사진'; im.appendChild(i); });
       body.insertBefore(im, body.firstChild);
+    }
+    if (m.sources && m.sources.length) {
+      var so = document.createElement('div'); so.className = 'srcs'; so.innerHTML = '<b>🔍 검색 출처</b>';
+      m.sources.forEach(function (x, k) { var a = document.createElement('a'); a.href = x.u; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = (k + 1) + '. ' + (x.t || x.u); so.appendChild(a); });
+      body.appendChild(so);
     }
     if (m.images && m.images.length) {
       var gi = document.createElement('div'); gi.className = 'gen';
@@ -223,6 +228,7 @@
         return res.json().catch(function () { return {}; }).then(function (j) { throw apiErr(res.status, j); });
       }).catch(function (e) {
         if (e && e.name === 'AbortError') throw e;
+        if (body.tools && (e.status === 400 || e.status === 429)) throw e;   // 검색 때문에 거절됐을 수 있으니 바로 알려 검색 없이 다시 하게 함
         var busy = e.status === 500 || e.status === 502 || e.status === 503 || e.status === 504 || e.status === 429;
         var missing = e.status === 404 && i > 0;
         if (busy && !retried) {
@@ -276,21 +282,35 @@
     save(); render(); setBusy(true);
     ctrl = new AbortController();
 
+    var useSearch = store.get(K_SEARCH, true) !== false;
+    var today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
     var body = {
-      systemInstruction: { parts: [{ text: store.get(K_SYS, '') || DEFAULT_SYS }] },
+      systemInstruction: { parts: [{ text: (store.get(K_SYS, '') || DEFAULT_SYS) + '\n오늘 날짜: ' + today + '. 최신 정보가 필요한 질문은 검색해서 답하세요.' }] },
       contents: contents(),
       generationConfig: { temperature: 0.7 }
     };
+    if (useSearch) body.tools = [{ google_search: {} }];
 
     var note = false;
     function setNote(t) { bot.text = t; note = true; paint(bi); }
-    openStream(key, body, setNote).then(function (res) {
+    var seen = {};
+    function addSrc(o) {
+      var gm = o.candidates && o.candidates[0] && (o.candidates[0].groundingMetadata || o.candidates[0].grounding_metadata);
+      var ch = gm && (gm.groundingChunks || gm.grounding_chunks) || [];
+      ch.forEach(function (c) { var w = c.web; if (w && w.uri && !seen[w.uri]) { seen[w.uri] = 1; (bot.sources = bot.sources || []).push({ u: w.uri, t: w.title || '' }); } });
+    }
+    openStream(key, body, setNote).catch(function (e) {   // 검색 연결이 거절되면(한도 등) 검색 없이 한 번 더
+      if (body.tools && e && (e.status === 400 || e.status === 429) && !(e.name === 'AbortError')) {
+        delete body.tools; setNote('🔍 검색을 쓸 수 없어 일반 답변으로 다시 시도해요…'); return openStream(key, body, setNote);
+      }
+      throw e;
+    }).then(function (res) {
       var reader = res.body.getReader(), dec = new TextDecoder(), buf = '';
       function line(l) {
         l = l.trim(); if (l.indexOf('data:') !== 0) return;
         var j = l.slice(5).trim(); if (!j || j === '[DONE]') return;
         try {
-          var o = JSON.parse(j);
+          var o = JSON.parse(j); addSrc(o);
           var parts = (o.candidates && o.candidates[0] && o.candidates[0].content && o.candidates[0].content.parts) || [];
           var t = parts.map(function (p) { return p.text || ''; }).join('');
           if (t) { if (note) { bot.text = ''; note = false; } bot.text += t; paint(bi); }
@@ -525,6 +545,10 @@
     input.placeholder = on ? '만들고 싶은 그림을 설명하세요 (사진을 붙이면 그 사진을 고쳐 줘요)' : '질문을 입력하세요 (Enter 보내기 · Shift+Enter 줄바꿈)';
     if (!busy) sendBtn.textContent = on ? '🎨 그리기' : '보내기';
   }
+  var sb = $('aiSearchBtn');
+  function paintSearch() { var on = store.get(K_SEARCH, true) !== false; sb.classList.toggle('sel', on); sb.textContent = on ? '🔍 검색 켬' : '🔍 검색 끔'; }
+  sb.onclick = function () { store.set(K_SEARCH, store.get(K_SEARCH, true) === false); paintSearch(); toast(store.get(K_SEARCH, true) === false ? '검색을 껐어요' : '실시간 검색을 켰어요'); };
+  paintSearch();
   $('aiImgBtn').onclick = function () { setImgMode(!imgMode); };
   (function initImgBar() {
     var ms = $('aiImgModel'), ar = $('aiImgAr');
@@ -575,6 +599,7 @@
     msgs.filter(function (m) { return !m.error && m.text; }).forEach(function (m) {
       out.push(m.role === 'user' ? '[나]' : '[AI]');
       if (m.thumbs && m.thumbs.length) out.push('(사진 ' + m.thumbs.length + '장 첨부)');
+      if (m.sources && m.sources.length) out.push('검색 출처: ' + m.sources.map(function (x) { return x.u; }).join(' , '));
       if (m.images && m.images.length) out.push('(AI가 만든 그림 ' + m.images.length + '장)');
       out.push(m.text, '');
     });
