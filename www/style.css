@@ -367,3 +367,6 @@
   body.mini #timer.idle #tmDisp{display:block!important}
   #ring .btn{margin-top:1.2rem}
   #ring, #ring *{-webkit-app-region:no-drag}   /* 작은 화면(드래그 영역)에서도 눌러서 끌 수 있게 */
+  .wedit{position:absolute;z-index:3;left:0;top:50%;width:calc(100% - 2.2rem);height:var(--ih);transform:translateY(-50%);box-sizing:border-box;text-align:center;
+         font:inherit;font-weight:800;font-size:calc(var(--ih)*.6);color:var(--text);background:var(--glass-strong);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:2px solid var(--accent);border-radius:16px;outline:none;padding:0}
+  .wedit::placeholder{color:var(--muted)}

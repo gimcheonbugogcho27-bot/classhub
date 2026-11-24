@@ -180,7 +180,7 @@ function setTmUI() {
   const idle = !tmRun && (tmLeft <= 0 || tmLeft >= tmSet);   // 멈춰 있고 아직 시작 전이면 휠로 맞추기
   $('timer').classList.toggle('idle', idle);
   if (idle) { const t = Math.round(tmLeft > 0 ? tmLeft : tmSet); tmWheel.set([Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60]); }
-  $('tmCap').textContent = tmRun ? '진행 중 · 시간을 더하거나 뺄 수 있어요' : idle ? '휠을 돌려 시간을 맞추세요 (컴퓨터는 마우스 휠)' : '숫자를 누르면 시간을 직접 입력할 수 있어요';
+  $('tmCap').textContent = tmRun ? '진행 중 · 시간을 더하거나 뺄 수 있어요' : idle ? '휠을 돌려 맞추세요 · 빨리 돌리면 빨리 넘어가고, 숫자를 누르면 직접 입력해요' : '숫자를 누르면 시간을 직접 입력할 수 있어요';
   $('tmDisp').classList.toggle('editable', !tmRun);
 }
 $('tmStart').onclick = () => {
@@ -321,7 +321,7 @@ nativeInit();
 /* ---------- 알람 ---------- */
 let aH = 9, aM = 0, alarms = store.get('classAlarms', []);
 const saveAlarms = () => store.set('classAlarms', alarms);
-const drawSet = () => { $('aPreview').textContent = `${aH < 12 ? '오전' : '오후'} ${aH % 12 || 12}시 ${pad(aM)}분 · 휠을 돌려 맞추세요`; };
+const drawSet = () => { $('aPreview').textContent = `${aH < 12 ? '오전' : '오후'} ${aH % 12 || 12}시 ${pad(aM)}분 · 휠을 돌리거나 숫자를 눌러 직접 입력`; };
 const aWheel = makeWheels($('aWheel'), [{ n: 24, label: '시', pad: true }, { n: 60, label: '분', pad: true }], v => { aH = v[0]; aM = v[1]; drawSet(); });
 aWheel.set([aH, aM]); drawSet();
 $('aAdd').onclick = () => {
