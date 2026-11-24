@@ -104,12 +104,16 @@
       <button class="pill" data-set="1800">30분</button>
       <button class="pill" data-set="2400">40분</button>
     </div>
+    <div class="row" id="tmRtChips" hidden></div>
     <details class="card glass tmmsgs" id="tmMsgBox">
       <summary>💬 안내 글씨 설정</summary>
       <label class="mlabel">시작하면 뜨는 글씨<input type="text" id="tmMsgStart" maxlength="40" placeholder="예) 모둠 토의를 시작해요!"></label>
       <div class="mlabel">시작하고 몇 분 뒤에 뜨는 글씨</div>
       <div id="tmMsgList"></div>
       <button class="pill plus" id="tmMsgAdd">+ 글씨 추가</button>
+      <div class="mlabel">📋 루틴 — 지금 시간과 글씨를 저장해 두고 한 번에 불러와요</div>
+      <div class="mrow"><input type="text" id="tmRtName" maxlength="20" placeholder="루틴 이름 (예: 모둠 토의)"><button class="pill plus" id="tmRtSave">💾 저장</button></div>
+      <div id="tmRtList"></div>
     </details>
   </section>
 

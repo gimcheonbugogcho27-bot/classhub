@@ -1,5 +1,5 @@
 // 오프라인에서도 열리게: 인터넷이 되면 새 버전, 안 되면 저장해 둔 버전
-const CACHE = 'classhub-v14';
+const CACHE = 'classhub-v15';
 const FILES = ['./', './index.html', './style.css', './wheel.js', './app.js', './qr.js', './ai.js', './qrcode-lib.js', './marble.js', './noise.js', './audio/pick.mp3', './audio/pick2.mp3', './audio/pick3.mp3', './vendor/planck.min.js', './vendor/jszip.min.js', './manifest.webmanifest', './web-icons/icon-180.png', './web-icons/icon-192.png', './web-icons/icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
