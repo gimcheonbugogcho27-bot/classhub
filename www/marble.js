@@ -196,6 +196,11 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
         <div class="count" id="pcount"></div>
       </div>
       <div class="bar">
+        <button type="button" id="rosterReload">명단 다시 불러오기</button>
+      </div>
+      <p class="hint" id="rosterMsg" role="status">우리반 명단은 GitHub 저장소(guselpick)의 이미지 이름에서 자동으로 불러와요. 이름은 고정이라 여기서 고치지 않아요.</p>
+      <div id="advBox" hidden>
+      <div class="bar">
         <input type="text" id="addName" placeholder="이름 입력 후 Enter" maxlength="20" style="flex:1">
         <button type="button" id="addBtn">추가</button>
       </div>
@@ -223,6 +228,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
         <button type="button" id="bulkAdd">목록에 추가</button>
       </div>
       <p class="hint">참여자 이름 칸을 눌러 바로 수정할 수 있어요. 이미지 여러 장은 파일 이름이 참여자 이름과 같으면 자동으로 연결되고, 없으면 새 참여자로 추가됩니다.</p>
+      </div>
       <div class="plist" id="plist"></div>
     </div>
   </aside>
@@ -799,10 +805,15 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   }
 
   var pickTarget=null;
+  var fixedRoster = false; try{ fixedRoster = localStorage.getItem('marblepick.roster')==='guselpick'; }catch(e){}
   function renderList(){
     var box=$('plist'); box.textContent='';
     S.people.forEach(function(p,idx){
       var row=document.createElement('div'); row.className='prow';
+      if(fixedRoster){
+        row.appendChild(avEl(p)); var nm=document.createElement('span'); nm.className='t'; nm.textContent=p.name; nm.style.cssText='flex:1;font-weight:500;padding:4px 2px'; row.appendChild(nm);
+        box.appendChild(row); return;
+      }
       var pick=document.createElement('button'); pick.type='button'; pick.className='pick'; pick.setAttribute('aria-label',p.name+' 이미지 선택');
       pick.appendChild(avEl(p));
       var plus=document.createElement('i'); plus.textContent='+'; pick.appendChild(plus);
@@ -932,13 +943,13 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   /* ---------- GitHub / ZIP / 폴더 불러오기 ---------- */
   var IMG_RE = /\.(png|jpe?g|gif|webp|bmp|avif)$/i;
   var BLOCK_MSG = '이 미리보기 화면에서는 GitHub에 직접 접속할 수 없어요. 저장소의 Code → Download ZIP으로 받은 파일을 "ZIP 불러오기"에 올려 주세요. GitHub Pages에 올린 페이지에서는 이 버튼으로 바로 불러옵니다.';
-  function setMsg(t){ $('ghMsg').textContent = t; }
+  function setMsg(t){ $('ghMsg').textContent = t; $('rosterMsg').textContent = t; }
   function nameFromFile(path){
     var b = path.split('/').pop().replace(/\.[^.]+$/,'');
     b = b.replace(/^\d+[\s._-]+/,'').replace(/_+/g,' ').trim();
     return (b || path.split('/').pop()).slice(0,20);
   }
-  function importBatch(entries, replace){
+  function importBatch(entries, replace, nameFn){
     if(S.phase==='run'){ setMsg('레이스가 끝난 뒤에 불러올 수 있어요.'); return Promise.resolve(0); }
     entries = entries.filter(function(e){ return IMG_RE.test(e.path) && !/(^|\/)(\.|__MACOSX)/.test(e.path); });
     entries.sort(function(a,b){ return a.path.localeCompare(b.path,'ko',{numeric:true}); });
@@ -949,7 +960,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
       if(i>=entries.length || list.length>=100) return Promise.resolve();
       var e = entries[i++];
       return fileToData(e.blob).then(function(d){
-        var nm = nameFromFile(e.path);
+        var nm = (nameFn||nameFromFile)(e.path);
         var hit = list.filter(function(q){ return q.name.trim().toLowerCase()===nm.toLowerCase(); })[0];
         if(hit) setImage(hit,d); else { var p = newPerson(nm); setImage(p,d); list.push(p); }
         added++;
@@ -1018,6 +1029,47 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
     var fs = Array.prototype.slice.call(e.target.files||[]);
     importBatch(fs.map(function(f){ return {path:f.webkitRelativePath||f.name, blob:f}; }), $('replaceList').checked);
   };
+  /* ---------- 우리반 고정 명단 (GitHub 저장소 guselpick) ---------- */
+  var ROSTER = {o:'gimcheonbugogcho27-bot', r:'guselpick', b:'main', p:''};
+  // 파일 이름 예: 07_박준희_아기펭귄.png → 박준희 (동물 이름은 뺌). 이름이 없는 파일(23_도마뱀.png)은 '23번'
+  function rosterName(path){
+    var base = path.split('/').pop().replace(/\.[^.]+$/,'');
+    var m = /^(\d+)[\s._-]+(.*)$/.exec(base), num = m ? m[1] : '', rest = m ? m[2] : base;
+    var parts = rest.split('_').map(function(x){ return x.trim(); }).filter(Boolean);
+    if(parts.length >= 2) return parts[0].slice(0,20);
+    return num ? (+num)+'번' : (parts[0]||'참여자').slice(0,20);
+  }
+  var rosterBusy = false;
+  function syncRoster(manual){
+    if(rosterBusy || S.phase==='run') return Promise.resolve();
+    rosterBusy = true; setMsg('우리반 명단을 불러오는 중…');
+    var api = 'https://api.github.com/repos/'+ROSTER.o+'/'+ROSTER.r+'/contents/'+(ROSTER.p?encodeURI(ROSTER.p):'')+'?ref='+ROSTER.b;
+    return fetch(api,{headers:{Accept:'application/vnd.github+json'}}).then(function(res){
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    }).then(function(items){
+      var files = (Array.isArray(items)?items:[]).filter(function(it){ return it.type==='file' && IMG_RE.test(it.name) && it.download_url; });
+      if(!files.length) throw new Error('empty');
+      var entries = [], idx = 0;
+      function worker(){
+        if(idx>=files.length) return Promise.resolve();
+        var it = files[idx++];
+        return fetch(it.download_url).then(function(r){ if(!r.ok) throw 0; return r.blob(); }).then(function(b){ entries.push({path:it.name, blob:b}); }).catch(function(){}).then(worker);
+      }
+      var ws = []; for(var k=0;k<6;k++) ws.push(worker());
+      return Promise.all(ws).then(function(){
+        if(entries.length < files.length) throw new Error('partial');
+        return importBatch(entries, true, rosterName);
+      });
+    }).then(function(n){
+      if(n){ try{ localStorage.setItem('marblepick.roster','guselpick'); }catch(e){} fixedRoster = true; renderList();
+        setMsg('우리반 명단 '+n+'명을 저장소에서 불러왔어요.'); if(manual) toast('명단을 새로 불러왔어요'); }
+    }).catch(function(){
+      setMsg(S.people.length && localStorage.getItem('marblepick.roster') ? '저장소에 접속하지 못해 저장된 명단을 써요. 인터넷이 연결되면 자동으로 다시 불러와요.' : '저장소에서 명단을 불러오지 못했어요. 인터넷 연결을 확인하고 "명단 다시 불러오기"를 눌러 주세요.');
+    }).then(function(){ rosterBusy = false; });
+  }
+  $('rosterReload').onclick = function(){ syncRoster(true); };
+
   function autoGithub(){
     var h = location.hostname;
     if(!/\.github\.io$/.test(h)) return;
@@ -1038,6 +1090,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   if(window.ResizeObserver){ new ResizeObserver(function(){ resize(); }).observe(cv); } else window.addEventListener('resize',resize);
   resize();
   try{ var sv=localStorage.getItem('marblepick.gh'); if(sv) $('ghUrl').value=sv; }catch(e){}
+  syncRoster(false);
   requestAnimationFrame(loop);
   document.addEventListener('tabchange',function(e){ if(e.detail==='marble'){ resize(); } });
 })(root,host,section);
