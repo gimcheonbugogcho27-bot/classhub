@@ -112,7 +112,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
 .board .av{width:28px;height:28px;font-size:13px;border-width:2px}
 .board td.g{font-weight:700}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}`;
-  var HTML = `<div class="mbroot"><div class="wrap">
+  var HTML = `<div class="mbroot"><audio id="bgm" src="audio/pick.mp3" preload="auto" loop></audio><div class="wrap">
   <header class="head">
     <h1>구슬 뽑기</h1>
     <p>참여자마다 구슬에 이미지를 넣고, 레이스 결과로 당첨자를 정합니다.</p>
@@ -187,6 +187,11 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
         <button type="button" data-v="1" aria-pressed="true">1배</button>
         <button type="button" data-v="2" aria-pressed="false">2배</button>
         <button type="button" data-v="4" aria-pressed="false">4배</button>
+      </div>
+      <div class="label" style="margin-top:4px">🎵 뽑기 노래</div>
+      <div class="seg" id="musicSeg">
+        <button type="button" data-v="1" aria-pressed="true">켜기</button>
+        <button type="button" data-v="0" aria-pressed="false">끄기</button>
       </div>
     </div>
 
@@ -442,7 +447,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
     }
     physInit(w);
     W = w;
-    S.phase = 'idle';
+    S.phase = 'idle'; if(typeof stopMusic==='function') stopMusic(false);
     cam = 0; camT = 0; camX = 0; camXT = 0;
     $('ov').hidden = true;
     updateButtons();
@@ -536,7 +541,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   }
   function finish(){
     if(S.phase!=='run') return;
-    S.phase='done';
+    S.phase='done'; stopMusic(true);
     var n=W.marbles.length, nw=Math.min(S.winners,n);
     var list = S.mode==='first' ? W.finished.slice(0,nw) : W.finished.slice(Math.max(0,W.finished.length-nw));
     recordStats(W.finished);
@@ -902,9 +907,33 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   $('wPlus').onclick=function(){ setWinners(S.winners+1); };
   $('wNum').onchange=function(){ setWinners($('wNum').value); };
 
+  /* ---------- 뽑기 노래 (레이스가 시작되면 나오고, 끝나면 서서히 작아지며 멈춤) ---------- */
+  var bgm = $('bgm'), music = true, fadeT = 0;
+  try{ music = localStorage.getItem('marblepick.music') !== '0'; }catch(e){}
+  function paintMusic(){ Array.prototype.forEach.call($('musicSeg').children,function(b){ b.setAttribute('aria-pressed',String((b.dataset.v==='1')===music)); }); }
+  Array.prototype.forEach.call($('musicSeg').children,function(b){
+    b.onclick=function(){ music = b.dataset.v==='1'; try{ localStorage.setItem('marblepick.music',music?'1':'0'); }catch(e){} paintMusic(); if(!music) stopMusic(false); else if(S.phase==='run') playMusic(); };
+  });
+  paintMusic();
+  function playMusic(){
+    clearInterval(fadeT); if(!music) return;
+    try{ bgm.volume = 1; bgm.currentTime = 0; var pr = bgm.play(); if(pr && pr.catch) pr.catch(function(){}); }catch(e){}
+  }
+  function stopMusic(fade){
+    clearInterval(fadeT);
+    if(!bgm||bgm.paused) return;
+    if(!fade){ bgm.pause(); bgm.currentTime = 0; return; }
+    fadeT = setInterval(function(){
+      if(bgm.volume > 0.08) bgm.volume = Math.max(0, bgm.volume - 0.08);
+      else { clearInterval(fadeT); bgm.pause(); bgm.currentTime = 0; bgm.volume = 1; }
+    },100);
+  }
+  document.addEventListener('visibilitychange',function(){ if(document.hidden) stopMusic(false); });
+
   $('startBtn').onclick=function(){
     if(S.phase!=='idle'||S.people.length<2) return;
     W.finished=[]; openGate(); S.phase='run'; updateButtons(); renderRank();
+    playMusic();
   };
   $('skipBtn').onclick=function(){ finishNow(); };
   $('followSel').onchange=function(){ setFollow(parseInt($('followSel').value,10)||0); };
@@ -1094,6 +1123,6 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   try{ var sv=localStorage.getItem('marblepick.gh'); if(sv) $('ghUrl').value=sv; }catch(e){}
   syncRoster(false);
   requestAnimationFrame(loop);
-  document.addEventListener('tabchange',function(e){ if(e.detail==='marble'){ resize(); } });
+  document.addEventListener('tabchange',function(e){ if(e.detail==='marble'){ resize(); } else stopMusic(false); });
 })(root,host,section);
 })();
