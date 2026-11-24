@@ -1037,8 +1037,10 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
     var m = /^(\d+)[\s._-]+(.*)$/.exec(base), num = m ? m[1] : '', rest = m ? m[2] : base;
     var parts = rest.split('_').map(function(x){ return x.trim(); }).filter(Boolean);
     if(parts.length >= 2) return parts[0].slice(0,20);
+    if(num && ROSTER_NAMES[+num]) return ROSTER_NAMES[+num];   // 파일 이름에 학생 이름이 없을 때 쓰는 번호별 이름
     return num ? (+num)+'번' : (parts[0]||'참여자').slice(0,20);
   }
+  var ROSTER_NAMES = {23:'이시우'};
   var rosterBusy = false;
   function syncRoster(manual){
     if(rosterBusy || S.phase==='run') return Promise.resolve();
