@@ -149,7 +149,9 @@ function drawLaps() {
 
 /* ---------- 타이머 ---------- */
 let tmSet = 300, tmLeft = 300, tmRun = false, tmEnd = 0, lastBeep = -1;
-let tmRepeat = store.get('tmRepeat', false), tmRounds = 0;   // 무한 반복: 끝나면 같은 시간으로 자동 다시 시작
+const REP_GAP = 7000;   // 반복할 때 끝 소리가 나는 시간(ms)
+let tmRepeat = store.get('tmRepeat', false), tmRounds = 0, tmGapEnd = 0, gapIv = null;
+function clearGap() { tmGapEnd = 0; clearInterval(gapIv); gapIv = null; }   // 무한 반복: 끝나면 같은 시간으로 자동 다시 시작
 const tmWheel = makeWheels($('tmWheel'), [{ n: 10, label: '시간' }, { n: 60, label: '분' }, { n: 60, label: '초' }], v => {
   const t = Math.min(10 * 3600 - 1, v[0] * 3600 + v[1] * 60 + v[2]);
   tmLeft = tmSet = t; tmRun = false;
@@ -172,12 +174,16 @@ function drawTM() {
     const c = Math.ceil(r);
     if (c <= 5 && c > 0 && c !== lastBeep) { lastBeep = c; beep(660, .12, 0, .3); }
     if (r <= 0) {
-      if (tmRepeat && tmSet > 0) {                       // 반복 중: 한 번 알리고 바로 다시 시작
-        tmRounds++;
-        tmEnd += tmSet * 1000; if (tmEnd < Date.now()) tmEnd = Date.now() + tmSet * 1000;   // 오차가 쌓이지 않게
-        lastBeep = -1; setTmUI();
-        try { audio(); (SOUNDS[settings.sound] || SOUNDS.beep).play(); } catch (e) {}
-        const c = $('timer').querySelector('.card'); c.classList.remove('rep'); void c.offsetWidth; c.classList.add('rep');
+      if (tmRepeat && tmSet > 0) {                       // 반복 중: 7초 동안 소리 → 같은 시간으로 다시 시작
+        const now = Date.now();
+        if (!tmGapEnd) {
+          tmGapEnd = now + REP_GAP; tmRounds++; setTmUI();
+          const sd = SOUNDS[settings.sound] || SOUNDS.beep;
+          try { audio(); sd.play(); gapIv = setInterval(() => { try { sd.play(); } catch (e) {} }, sd.every); } catch (e) {}
+          const c = $('timer').querySelector('.card'); c.classList.remove('rep'); void c.offsetWidth; c.classList.add('rep');
+        } else if (now >= tmGapEnd) {
+          clearGap(); tmEnd = now + tmSet * 1000; lastBeep = -1; setTmUI();
+        }
       } else { tmRun = false; tmLeft = 0; setTmUI(); startRing('시간 끝!'); }
     }
   }
@@ -191,11 +197,12 @@ function setTmUI() {
   if (idle) { const t = Math.round(tmLeft > 0 ? tmLeft : tmSet); tmWheel.set([Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60]); }
   $('tmRep').classList.toggle('sel', tmRepeat);
   $('tmRep').textContent = tmRepeat ? '🔁 반복 켬' : '🔁 반복 끔';
-  $('tmCap').textContent = tmRun ? (tmRepeat ? `🔁 반복 중 · ${tmRounds + 1}번째 · 멈추려면 일시정지` : '진행 중 · 시간을 더하거나 뺄 수 있어요') : idle ? '휠을 돌려 맞추세요 · 빨리 돌리면 빨리 넘어가고, 숫자를 누르면 직접 입력해요' : '숫자를 누르면 시간을 직접 입력할 수 있어요';
+  $('tmCap').textContent = tmRun ? (tmRepeat ? (tmGapEnd ? `🔔 시간 끝! 잠시 후 ${tmRounds + 1}번째 시작` : `🔁 반복 중 · ${tmRounds + 1}번째 · 멈추려면 일시정지`) : '진행 중 · 시간을 더하거나 뺄 수 있어요') : idle ? '휠을 돌려 맞추세요 · 빨리 돌리면 빨리 넘어가고, 숫자를 누르면 직접 입력해요' : '숫자를 누르면 시간을 직접 입력할 수 있어요';
   $('tmDisp').classList.toggle('editable', !tmRun);
 }
 $('tmStart').onclick = () => {
   audio();
+  clearGap();
   if (tmRun) { tmLeft = tmRemaining(); tmRun = false; }
   else {
     if (tmLeft <= 0) tmLeft = tmSet;
@@ -206,7 +213,7 @@ $('tmStart').onclick = () => {
   setTmUI(); drawTM();
 };
 $('tmRep').onclick = () => { tmRepeat = !tmRepeat; store.set('tmRepeat', tmRepeat); setTmUI(); };
-$('tmReset').onclick = () => { tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
+$('tmReset').onclick = () => { clearGap(); tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
 document.querySelectorAll('#tmPre .pill').forEach(b => b.onclick = () => {
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', x === b));
   tmSet = tmLeft = +b.dataset.set; setTmUI(); drawTM();
@@ -217,6 +224,7 @@ document.querySelectorAll('#tmAdj .pill').forEach(b => b.onclick = () => {
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.remove('sel'));
   if (tmRun) {
     // 진행 중: 남은 시간만 조절 (최소 1초 남김)
+    clearGap();
     const r = Math.min(MAX, Math.max(1, tmRemaining() + add));
     tmEnd = Date.now() + r * 1000;
     if (r > tmSet) tmSet = Math.ceil(r);
@@ -321,10 +329,10 @@ async function nativeSchedule() {    // 앱이 화면에서 사라질 때 예약
       schedule: { on: { hour: a.h, minute: a.m }, allowWhileIdle: true }
     }));
     if (tmRun && tmEnd > Date.now() + 1000) {
-      const times = tmRepeat && tmSet >= 5 ? Math.min(60, Math.floor(7200 / tmSet)) : 1;   // 반복이면 앞으로 2시간 안에서 최대 60번
+      const times = tmRepeat && tmSet >= 5 ? Math.min(60, Math.floor(7200 / (tmSet + 7))) : 1;   // 반복이면 앞으로 2시간 안에서 최대 60번
       for (let k = 0; k < Math.max(1, times); k++) list.push({
         id: k ? 200 + k : 1, title: k ? `🔁 ${k + 1}번째 시간 끝!` : '⏳ 시간 끝!', body: tmRepeat ? '반복 타이머' : '타이머가 끝났어요', channelId: ch, smallIcon: 'ic_stat_timer', iconColor: '#5b5bf0',
-        schedule: { at: new Date(tmEnd + k * tmSet * 1000), allowWhileIdle: true }
+        schedule: { at: new Date(tmEnd + k * (tmSet + 7) * 1000), allowWhileIdle: true }
       });
     }
     if (list.length) await LN.schedule({ notifications: list });
