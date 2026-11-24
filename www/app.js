@@ -91,7 +91,7 @@ function startRing(msg) {
   clearTimeout(ringStop);
   if (settings.autoStop) ringStop = setTimeout(stopRing, settings.autoStop * 1000);   // 자동 멈춤
 }
-function stopRing() { if (typeof tmGapEnd !== 'undefined' && tmGapEnd) tmGapEnd = 1;   // 반복 알림 중 누르면 바로 다음 회차
+function stopRing() { if (typeof tmTransRing !== 'undefined') tmTransRing = false; if (typeof tmGapEnd !== 'undefined' && tmGapEnd) tmGapEnd = 1;   // 반복 알림 중 누르면 바로 다음 회차
   clearInterval(ringTimer); clearTimeout(ringStop); ringTimer = ringStop = null; $('ring').classList.remove('on'); }
 $('ring').onclick = stopRing;
 $('ringStop').onclick = e => { e.stopPropagation(); stopRing(); };
@@ -163,15 +163,20 @@ function showMsg(t, beepOn) {
   const el = $('tmMsg'); el.textContent = t || ''; el.hidden = !t;
   if (t) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); if (beepOn) try { audio(); beep(880, .15, 0, .3); beep(1175, .2, .18, .3); } catch (e) {} }
 }
-let tmPend = null;   // 글씨 사이 '넘어가는 시간' 동안 기다리는 다음 글씨
-function msgRoundStart() { tmFired = new Set(); tmPend = null; showMsg(tmMsgs.start, false); }
+let tmPend = null, tmTransRing = false;
+function hideTrans() { if (!tmTransRing) return; tmTransRing = false; if (!ringTimer && !tmGapEnd) $('ring').classList.remove('on'); }
+function showTransRing(text, sec) {     // 글씨 사이 전환: 시간 끝처럼 전체 화면으로
+  if (ringTimer || tmGapEnd) return;     // 종료 알림이 이미 떠 있으면 건드리지 않음
+  $('ringMsg').textContent = text; $('ringAuto').textContent = ` · ${sec}초 뒤 다음 글씨`; $('ring').classList.add('on'); tmTransRing = true;
+}   // 글씨 사이 '넘어가는 시간' 동안 기다리는 다음 글씨
+function msgRoundStart() { tmFired = new Set(); tmPend = null; hideTrans(); showMsg(tmMsgs.start, false); }
 function msgTick(r) {
   const el = (tmSet - r), now = Date.now();
-  if (tmPend && now >= tmPend.until) { showMsg(tmPend.text, true); tmPend = null; }
+  if (tmPend && now >= tmPend.until) { hideTrans(); showMsg(tmPend.text, true); tmPend = null; }
   tmMsgs.list.forEach((x, i) => {
     if (!(tmMsgOn && x.t && Math.round(x.m * 60) < Math.round(tmSet) && !tmFired.has(i) && el >= x.m * 60)) return;
     tmFired.add(i);
-    if (tmMsgs.gap > 0 && tmMsgs.gapText) { showMsg(tmMsgs.gapText, true); tmPend = { text: x.t, until: now + tmMsgs.gap * 1000 }; }   // 넘어가는 동안 전환 글씨
+    if (tmMsgs.gap > 0 && tmMsgs.gapText) { showMsg(tmMsgs.gapText, true); showTransRing(tmMsgs.gapText, tmMsgs.gap); tmPend = { text: x.t, until: now + tmMsgs.gap * 1000 }; }   // 넘어가는 동안 전환 글씨
     else { tmPend = null; showMsg(x.t, true); }
   });
 }
@@ -198,7 +203,7 @@ function renderMsgEditor() {
 }
 function setMsgOn(v) {
   tmMsgOn = v; store.set('tmMsgOn', v); $('tmMsgOn').textContent = v ? '💬 안내 글씨 켬' : '💬 안내 글씨 끔'; $('tmMsgOn').classList.toggle('sel', v);
-  $('tmMsgBox').classList.toggle('off', !v); if (!v) showMsg(''); else if (tmRun) showMsg(tmMsgs.start);
+  $('tmMsgBox').classList.toggle('off', !v); if (!v) { showMsg(''); tmPend = null; hideTrans(); } else if (tmRun) showMsg(tmMsgs.start);
   if (typeof nativeSchedule === 'function' && tmRun) nativeSchedule();
 }
 $('tmMsgOn').onclick = e => { e.preventDefault(); e.stopPropagation(); setMsgOn(!tmMsgOn); };
@@ -268,7 +273,7 @@ function drawTM() {
         } else if (now >= tmGapEnd) {
           clearGap(); $('ring').classList.remove('on'); tmEnd = now + tmSet * 1000; lastBeep = -1; msgRoundStart(); setTmUI();
         }
-      } else { tmRun = false; tmLeft = 0; tmPend = null; showMsg(''); setTmUI(); startRing(endText() || '시간 끝!'); }
+      } else { tmRun = false; tmLeft = 0; tmPend = null; tmTransRing = false; showMsg(''); setTmUI(); startRing(endText() || '시간 끝!'); }
     }
   }
 }
@@ -287,7 +292,7 @@ function setTmUI() {
 }
 $('tmStart').onclick = () => {
   audio();
-  clearGap();
+  clearGap(); hideTrans();
   if (tmRun) { tmLeft = tmRemaining(); tmRun = false; }
   else {
     if (tmLeft <= 0) tmLeft = tmSet;
@@ -298,7 +303,7 @@ $('tmStart').onclick = () => {
   setTmUI(); drawTM();
 };
 $('tmRep').onclick = () => { tmRepeat = !tmRepeat; store.set('tmRepeat', tmRepeat); setTmUI(); };
-$('tmReset').onclick = () => { clearGap(); tmPend = null; showMsg(''); tmFired = new Set(); tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
+$('tmReset').onclick = () => { clearGap(); tmPend = null; hideTrans(); showMsg(''); tmFired = new Set(); tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
 document.querySelectorAll('#tmPre .pill').forEach(b => b.onclick = () => {
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', x === b));
   tmSet = tmLeft = +b.dataset.set; setTmUI(); drawTM();
