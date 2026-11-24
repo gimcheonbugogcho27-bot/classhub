@@ -155,7 +155,7 @@ let tmMusic = store.get('tmMusic', true), musFade = null;
 function musVol() { return Math.max(0, Math.min(1, (settings.vol || 80) / 100)) * .5; }
 function syncMusic() {
   const a = $('tmBgm'); if (!a) return;
-  $('tmMus').textContent = tmMusic ? '🎵 음악 켬' : '🎵 음악 끔'; $('tmMus').classList.toggle('sel', tmMusic);
+  $('tmMus').textContent = tmMusic ? '🎹 피아노 켬' : '🎹 피아노 끔'; $('tmMus').classList.toggle('sel', tmMusic);
   const want = tmMusic && tmRun && !tmGapEnd;
   clearInterval(musFade);
   if (want) {
