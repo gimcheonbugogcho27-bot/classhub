@@ -398,3 +398,20 @@
   #tmRep.sel{background:var(--accent);color:var(--on-accent)}
   #timer .card.rep{animation:tmrep .6s ease-out}
   @keyframes tmrep{0%{box-shadow:0 0 0 0 var(--accent)}100%{box-shadow:0 0 0 1.6rem transparent}}
+  .tmmsg{font-size:clamp(1.3rem,5vw,2.2rem);font-weight:800;text-align:center;color:var(--accent);margin:.2rem 0 .4rem;word-break:keep-all}
+  .tmmsg.pop{animation:msgpop .5s ease-out}
+  @keyframes msgpop{0%{transform:scale(.7);opacity:0}100%{transform:scale(1);opacity:1}}
+  .tmmsgs{padding:.8rem 1rem;margin-top:.6rem}
+  .tmmsgs summary{cursor:pointer;font-weight:700}
+  .tmmsgs .mlabel{display:block;margin:.6rem 0 .3rem;font-weight:600;font-size:.92rem}
+  .tmmsgs input{font:inherit;border:1px solid var(--border);background:var(--glass);color:var(--text);border-radius:.6rem;padding:.4rem .6rem;min-width:0}
+  .tmmsgs label input{display:block;width:100%;margin-top:.3rem;box-sizing:border-box}
+  .tmmsgs .mrow{display:flex;gap:.4rem;align-items:center;margin-bottom:.4rem}
+  .tmmsgs .mrow input[type=number]{width:4.2rem}
+  .tmmsgs .mrow input[type=text]{flex:1}
+  body.mini .tmmsgs{display:none}
+  #timer{overflow-y:auto;justify-content:safe center;padding-bottom:max(1.5rem,env(safe-area-inset-bottom))}
+  #timer>*{flex-shrink:0}
+  .tmmsgs{align-items:stretch;box-sizing:border-box;display:block}
+  .tmmsgs *{box-sizing:border-box}
+  .tmmsgs summary{text-align:center}

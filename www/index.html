@@ -76,6 +76,7 @@
     <div class="card glass">
       <div class="cap" id="tmCap">타이머</div>
       <div class="wheels" id="tmWheel" aria-label="타이머 시간 맞추기"></div>
+      <div class="tmmsg" id="tmMsg" hidden></div>
       <div class="big num" id="tmDisp" title="눌러서 시간 직접 입력">05:00</div>
       <div class="bar" id="tmBarWrap"><div id="tmBar"></div></div>
       <div class="ctrls">
@@ -103,6 +104,13 @@
       <button class="pill" data-set="1800">30분</button>
       <button class="pill" data-set="2400">40분</button>
     </div>
+    <details class="card glass tmmsgs" id="tmMsgBox">
+      <summary>💬 안내 글씨 설정</summary>
+      <label class="mlabel">시작하면 뜨는 글씨<input type="text" id="tmMsgStart" maxlength="40" placeholder="예) 모둠 토의를 시작해요!"></label>
+      <div class="mlabel">시작하고 몇 분 뒤에 뜨는 글씨</div>
+      <div id="tmMsgList"></div>
+      <button class="pill plus" id="tmMsgAdd">+ 글씨 추가</button>
+    </details>
   </section>
 
   <!-- 알람 -->
