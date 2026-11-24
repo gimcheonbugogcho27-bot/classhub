@@ -190,7 +190,8 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
       </div>
       <div class="label" style="margin-top:4px">🎵 뽑기 노래</div>
       <div class="seg" id="musicSeg">
-        <button type="button" data-v="1" aria-pressed="true">켜기</button>
+        <button type="button" data-v="1" aria-pressed="true">노래 1</button>
+        <button type="button" data-v="2" aria-pressed="false">노래 2</button>
         <button type="button" data-v="0" aria-pressed="false">끄기</button>
       </div>
     </div>
@@ -908,16 +909,16 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   $('wNum').onchange=function(){ setWinners($('wNum').value); };
 
   /* ---------- 뽑기 노래 (레이스가 시작되면 나오고, 끝나면 서서히 작아지며 멈춤) ---------- */
-  var bgm = $('bgm'), music = true, fadeT = 0;
-  try{ music = localStorage.getItem('marblepick.music') !== '0'; }catch(e){}
-  function paintMusic(){ Array.prototype.forEach.call($('musicSeg').children,function(b){ b.setAttribute('aria-pressed',String((b.dataset.v==='1')===music)); }); }
+  var bgm = $('bgm'), song = '1', fadeT = 0, SONGS = {'1':'audio/pick.mp3','2':'audio/pick2.mp3'};
+  try{ var sv = localStorage.getItem('marblepick.song'); if(sv===null && localStorage.getItem('marblepick.music')==='0') sv='0'; if(sv==='0'||sv==='1'||sv==='2') song=sv; }catch(e){}
+  function paintMusic(){ Array.prototype.forEach.call($('musicSeg').children,function(b){ b.setAttribute('aria-pressed',String(b.dataset.v===song)); }); }
   Array.prototype.forEach.call($('musicSeg').children,function(b){
-    b.onclick=function(){ music = b.dataset.v==='1'; try{ localStorage.setItem('marblepick.music',music?'1':'0'); }catch(e){} paintMusic(); if(!music) stopMusic(false); else if(S.phase==='run') playMusic(); };
+    b.onclick=function(){ song = b.dataset.v; try{ localStorage.setItem('marblepick.song',song); }catch(e){} paintMusic(); stopMusic(false); if(song!=='0' && S.phase==='run') playMusic(); };
   });
   paintMusic();
   function playMusic(){
-    clearInterval(fadeT); if(!music) return;
-    try{ bgm.volume = 1; bgm.currentTime = 0; var pr = bgm.play(); if(pr && pr.catch) pr.catch(function(){}); }catch(e){}
+    clearInterval(fadeT); if(song==='0') return;
+    try{ if(bgm.getAttribute('src')!==SONGS[song]){ bgm.setAttribute('src',SONGS[song]); } bgm.volume = 1; bgm.currentTime = 0; var pr = bgm.play(); if(pr && pr.catch) pr.catch(function(){}); }catch(e){}
   }
   function stopMusic(fade){
     clearInterval(fadeT);
