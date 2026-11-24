@@ -390,3 +390,7 @@
   #nzCard.flash{animation:nzflash .5s ease-in-out 3}
   @keyframes nzflash{50%{box-shadow:0 0 0 .6rem #ff4b4b inset}}
   #nzPre .pill.sel,#nzSnd.sel{background:var(--accent);color:var(--on-accent)}
+  .nzsl{display:grid;gap:.4rem;width:100%}
+  .nzsl label{display:grid;grid-template-columns:auto 3em 1fr;align-items:center;gap:.6rem;color:var(--muted);font-weight:700}
+  .nzsl b{color:var(--text);text-align:right}
+  .nzsl input{width:100%;accent-color:var(--accent)}

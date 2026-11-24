@@ -152,12 +152,16 @@
       <div class="cap">교실 소음 측정기</div>
       <div class="nzlight" id="nzLight"><i></i><i></i><i></i></div>
       <div class="big num" id="nzMsg">마이크가 꺼져 있어요</div>
-      <div class="nzlvl"><b class="num" id="nzNum">0</b><span>소리 크기 (0~100)</span></div>
+      <div class="nzlvl"><b class="num" id="nzNum">0</b><span>소리 크기 (0~250)</span></div>
       <div class="nzbar" id="nzBar"><div id="nzFill"></div><u id="nzY"></u><u id="nzR"></u></div>
       <canvas id="nzGraph" width="600" height="90"></canvas>
       <div class="row">
         <button class="btn primary" id="nzStart">마이크 켜기</button>
         <button class="btn ghost" id="nzCal">지금 소리를 '조용'으로 맞추기</button>
+      </div>
+      <div class="nzsl">
+        <label>🟡 노랑 기준 <b class="num" id="nzYv">100</b><input type="range" id="nzYs" min="0" max="250" step="1"></label>
+        <label>🔴 빨강 기준 <b class="num" id="nzRv">155</b><input type="range" id="nzRs" min="0" max="250" step="1"></label>
       </div>
       <div class="row" id="nzPre">
         <button class="pill" data-p="strict">엄격</button>
