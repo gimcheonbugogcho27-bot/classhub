@@ -396,7 +396,7 @@ document.addEventListener('keydown', e => {
   if (cur === 'timer' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault(); document.querySelector(`#tmAdj [data-add="${e.key === 'ArrowUp' ? 60 : -60}"]`).click();
   }
-  const n = ['1','2','3','4','5','6','7'].indexOf(e.key);
+  const n = ['1','2','3','4','5','6','7','8'].indexOf(e.key);
   if (n >= 0 && !(mini && n >= 3)) tabs[n].click();
 });
 

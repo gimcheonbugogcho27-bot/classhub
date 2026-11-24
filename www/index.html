@@ -32,6 +32,7 @@
     <button data-t="qr">QR</button>
     <button data-t="ai">AI</button>
     <button data-t="marble">구슬</button>
+    <button data-t="noise">소음</button>
   </div>
   <div class="tools">
     <button class="icon glass" id="setBtn" title="소리 설정">⚙️</button>
@@ -144,6 +145,33 @@
 
   <!-- 구슬 뽑기 (화면은 marble.js 가 만듭니다) -->
   <section id="marble" class="scroll"></section>
+
+  <!-- 소음 측정기 -->
+  <section id="noise" class="scroll">
+    <div class="card glass nz" id="nzCard">
+      <div class="cap">교실 소음 측정기</div>
+      <div class="nzlight" id="nzLight"><i></i><i></i><i></i></div>
+      <div class="big num" id="nzMsg">마이크가 꺼져 있어요</div>
+      <div class="nzlvl"><b class="num" id="nzNum">0</b><span>소리 크기 (0~100)</span></div>
+      <div class="nzbar" id="nzBar"><div id="nzFill"></div><u id="nzY"></u><u id="nzR"></u></div>
+      <canvas id="nzGraph" width="600" height="90"></canvas>
+      <div class="row">
+        <button class="btn primary" id="nzStart">마이크 켜기</button>
+        <button class="btn ghost" id="nzCal">지금 소리를 '조용'으로 맞추기</button>
+      </div>
+      <div class="row" id="nzPre">
+        <button class="pill" data-p="strict">엄격</button>
+        <button class="pill sel" data-p="normal">보통</button>
+        <button class="pill" data-p="loose">느슨 (활동 수업)</button>
+      </div>
+      <div class="row">
+        <button class="pill sel" id="nzSnd">🔔 너무 시끄러우면 소리로 알림</button>
+        <span class="nzcount">경고 <b class="num" id="nzCnt">0</b>번</span>
+        <button class="pill" id="nzReset">횟수 지우기</button>
+      </div>
+      <div class="cap" id="nzNote">마이크 소리는 이 기기 안에서만 크기를 재고, 녹음하거나 저장하지 않아요.</div>
+    </div>
+  </section>
 
   <!-- AI 대화 -->
   <section id="ai">
@@ -282,6 +310,7 @@
 <script src="vendor/planck.min.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="marble.js"></script>
+<script src="noise.js"></script>
 <script src="update.js"></script>
 </body>
 </html>

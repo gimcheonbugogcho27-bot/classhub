@@ -370,3 +370,23 @@
   .wedit{position:absolute;z-index:3;left:0;top:50%;width:calc(100% - 2.2rem);height:var(--ih);transform:translateY(-50%);box-sizing:border-box;text-align:center;
          font:inherit;font-weight:800;font-size:calc(var(--ih)*.6);color:var(--text);background:var(--glass-strong);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:2px solid var(--accent);border-radius:16px;outline:none;padding:0}
   .wedit::placeholder{color:var(--muted)}
+
+  /* ===== 소음 측정기 ===== */
+  .nz{width:min(94vw,640px);gap:1rem}
+  .nzlight{display:flex;gap:min(3vw,1.1rem);padding:.7rem 1.1rem;border-radius:999px;background:rgba(0,0,0,.35);border:1px solid var(--border)}
+  .nzlight i{width:clamp(2.4rem,min(14vw,12vh),4.6rem);aspect-ratio:1;border-radius:50%;background:var(--glass-strong);opacity:.35;transition:opacity .15s,box-shadow .15s,background .15s}
+  .nzlight i:nth-child(1).on{background:#2bd16a;opacity:1;box-shadow:0 0 28px #2bd16a}
+  .nzlight i:nth-child(2).on{background:#f5c518;opacity:1;box-shadow:0 0 28px #f5c518}
+  .nzlight i:nth-child(3).on{background:#ff4b4b;opacity:1;box-shadow:0 0 34px #ff4b4b}
+  #nzMsg{font-size:clamp(1.8rem,min(8vw,9vh),4rem);line-height:1.15;text-align:center}
+  #nzMsg.ok{color:#2bd16a}#nzMsg.warn{color:#f5c518}#nzMsg.bad{color:#ff4b4b}
+  .nzlvl{display:flex;align-items:baseline;gap:.6rem;color:var(--muted)}
+  .nzlvl b{font-size:clamp(2rem,6vw,3.4rem);color:var(--text)}
+  .nzbar{position:relative;width:100%;height:1.6rem;border-radius:999px;background:var(--glass-strong);overflow:hidden}
+  #nzFill{height:100%;width:0;border-radius:999px;background:#2bd16a;transition:width .08s linear,background .15s}
+  .nzbar u{position:absolute;top:0;bottom:0;width:3px;background:var(--text);opacity:.7}
+  #nzGraph{width:100%;height:auto;border-radius:14px;background:rgba(0,0,0,.2)}
+  .nzcount{color:var(--muted);font-weight:700}.nzcount b{color:var(--text)}
+  #nzCard.flash{animation:nzflash .5s ease-in-out 3}
+  @keyframes nzflash{50%{box-shadow:0 0 0 .6rem #ff4b4b inset}}
+  #nzPre .pill.sel,#nzSnd.sel{background:var(--accent);color:var(--on-accent)}
