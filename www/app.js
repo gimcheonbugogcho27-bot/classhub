@@ -165,6 +165,11 @@ function syncMusic() {
     musFade = setInterval(() => { a.volume = Math.max(0, a.volume - .08); if (a.volume <= 0) { clearInterval(musFade); a.pause(); } }, 40);
   }
 }
+$('tmSong').value = store.get('tmSong', '1'); $('tmBgm').src = `audio/piano${$('tmSong').value}.mp3`;
+$('tmSong').onchange = () => {
+  store.set('tmSong', $('tmSong').value); const a = $('tmBgm'), was = !a.paused;
+  clearInterval(musFade); a.pause(); a.src = `audio/piano${$('tmSong').value}.mp3`; a.currentTime = 0; if (was) { a.volume = 0; syncMusic(); }
+};
 $('tmMus').onclick = () => { tmMusic = !tmMusic; store.set('tmMusic', tmMusic); syncMusic(); };
 const REP_GAP = 7000;   // 반복할 때 끝 소리가 나는 시간(ms)
 let tmRepeat = store.get('tmRepeat', false), tmRounds = 0, tmGapEnd = 0, gapIv = null;
