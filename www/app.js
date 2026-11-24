@@ -154,16 +154,19 @@ const REP_GAP = 7000;   // 반복할 때 끝 소리가 나는 시간(ms)
 let tmRepeat = store.get('tmRepeat', false), tmRounds = 0, tmGapEnd = 0, gapIv = null;
 /* 안내 글씨: 시작할 때 / 시작하고 N분 뒤에 뜨는 글씨 */
 const tmMsgs = Object.assign({ start: '', list: [] }, store.get('tmMsgs', {}));
-let tmFired = new Set();
+let tmFired = new Set(), tmMsgOn = store.get('tmMsgOn', true);
+// 타이머 설정 시간과 같은 'N분 뒤' 글씨가 있으면 끝날 때 '시간 끝!' 대신 그 글씨를 띄운다
+const endText = () => { if (!tmMsgOn) return ''; const x = tmMsgs.list.find(x => x.t && Math.round(x.m * 60) === Math.round(tmSet)); return x ? x.t : ''; };
 const saveMsgs = () => store.set('tmMsgs', tmMsgs);
 function showMsg(t, beepOn) {
+  if (!tmMsgOn) t = '';
   const el = $('tmMsg'); el.textContent = t || ''; el.hidden = !t;
   if (t) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); if (beepOn) try { audio(); beep(880, .15, 0, .3); beep(1175, .2, .18, .3); } catch (e) {} }
 }
 function msgRoundStart() { tmFired = new Set(); showMsg(tmMsgs.start, false); }
 function msgTick(r) {
   const el = (tmSet - r);
-  tmMsgs.list.forEach((x, i) => { if (x.t && !tmFired.has(i) && el >= x.m * 60) { tmFired.add(i); showMsg(x.t, true); } });
+  tmMsgs.list.forEach((x, i) => { if (tmMsgOn && x.t && Math.round(x.m * 60) < Math.round(tmSet) && !tmFired.has(i) && el >= x.m * 60) { tmFired.add(i); showMsg(x.t, true); } });
 }
 function renderMsgEditor() {
   $('tmMsgStart').value = tmMsgs.start;
@@ -171,6 +174,13 @@ function renderMsgEditor() {
     `<div class="mrow"><input type="number" min="0" max="599" value="${x.m}" data-i="${i}" data-k="m" aria-label="몇 분 뒤"><span>분 뒤</span>` +
     `<input type="text" maxlength="40" value="${x.t.replace(/"/g, '&quot;')}" placeholder="뜨는 글씨" data-i="${i}" data-k="t"><button class="pill minus" data-del="${i}">×</button></div>`).join('');
 }
+function setMsgOn(v) {
+  tmMsgOn = v; store.set('tmMsgOn', v); $('tmMsgOn').textContent = v ? '💬 안내 글씨 켬' : '💬 안내 글씨 끔'; $('tmMsgOn').classList.toggle('sel', v);
+  $('tmMsgBox').classList.toggle('off', !v); if (!v) showMsg(''); else if (tmRun) showMsg(tmMsgs.start);
+  if (typeof nativeSchedule === 'function' && tmRun) nativeSchedule();
+}
+$('tmMsgOn').onclick = e => { e.preventDefault(); e.stopPropagation(); setMsgOn(!tmMsgOn); };
+setMsgOn(tmMsgOn);
 $('tmMsgStart').oninput = e => { tmMsgs.start = e.target.value; saveMsgs(); };
 $('tmMsgList').oninput = e => { const i = +e.target.dataset.i, k = e.target.dataset.k; if (k) { tmMsgs.list[i][k] = k === 'm' ? Math.max(0, +e.target.value || 0) : e.target.value; saveMsgs(); } };
 $('tmMsgList').onclick = e => { const d = e.target.dataset.del; if (d != null) { tmMsgs.list.splice(+d, 1); saveMsgs(); renderMsgEditor(); } };
@@ -229,14 +239,14 @@ function drawTM() {
         const now = Date.now();
         if (!tmGapEnd) {
           tmGapEnd = now + REP_GAP; tmRounds++; setTmUI();
-          $('ringMsg').textContent = '시간 끝!'; $('ringAuto').textContent = ` · ${REP_GAP / 1000}초 뒤 다음 시작`; $('ring').classList.add('on');
+          $('ringMsg').textContent = endText() || '시간 끝!'; $('ringAuto').textContent = ` · ${REP_GAP / 1000}초 뒤 다음 시작`; $('ring').classList.add('on');
           const sd = SOUNDS[settings.sound] || SOUNDS.beep;
           try { audio(); sd.play(); gapIv = setInterval(() => { try { sd.play(); } catch (e) {} }, sd.every); } catch (e) {}
           const c = $('timer').querySelector('.card'); c.classList.remove('rep'); void c.offsetWidth; c.classList.add('rep');
         } else if (now >= tmGapEnd) {
           clearGap(); $('ring').classList.remove('on'); tmEnd = now + tmSet * 1000; lastBeep = -1; msgRoundStart(); setTmUI();
         }
-      } else { tmRun = false; tmLeft = 0; showMsg(''); setTmUI(); startRing('시간 끝!'); }
+      } else { tmRun = false; tmLeft = 0; showMsg(''); setTmUI(); startRing(endText() || '시간 끝!'); }
     }
   }
 }
@@ -383,7 +393,7 @@ async function nativeSchedule() {    // 앱이 화면에서 사라질 때 예약
     if (tmRun && tmEnd > Date.now() + 1000) {
       const times = tmRepeat && tmSet >= 5 ? Math.min(60, Math.floor(7200 / (tmSet + 7))) : 1;   // 반복이면 앞으로 2시간 안에서 최대 60번
       for (let k = 0; k < Math.max(1, times); k++) list.push({
-        id: k ? 200 + k : 1, title: k ? `🔁 ${k + 1}번째 시간 끝!` : '⏳ 시간 끝!', body: tmRepeat ? '반복 타이머' : '타이머가 끝났어요', channelId: ch, smallIcon: 'ic_stat_timer', iconColor: '#5b5bf0',
+        id: k ? 200 + k : 1, title: k ? `🔁 ${k + 1}번째 ${endText() || '시간 끝!'}` : `⏳ ${endText() || '시간 끝!'}`, body: tmRepeat ? '반복 타이머' : '타이머가 끝났어요', channelId: ch, smallIcon: 'ic_stat_timer', iconColor: '#5b5bf0',
         schedule: { at: new Date(tmEnd + k * (tmSet + 7) * 1000), allowWhileIdle: true }
       });
     }
