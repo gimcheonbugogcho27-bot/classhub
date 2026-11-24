@@ -192,6 +192,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
       <div class="seg" id="musicSeg">
         <button type="button" data-v="1" aria-pressed="true">노래 1</button>
         <button type="button" data-v="2" aria-pressed="false">노래 2</button>
+        <button type="button" data-v="3" aria-pressed="false">노래 3</button>
         <button type="button" data-v="0" aria-pressed="false">끄기</button>
       </div>
     </div>
@@ -909,8 +910,8 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   $('wNum').onchange=function(){ setWinners($('wNum').value); };
 
   /* ---------- 뽑기 노래 (레이스가 시작되면 나오고, 끝나면 서서히 작아지며 멈춤) ---------- */
-  var bgm = $('bgm'), song = '1', fadeT = 0, SONGS = {'1':'audio/pick.mp3','2':'audio/pick2.mp3'};
-  try{ var sv = localStorage.getItem('marblepick.song'); if(sv===null && localStorage.getItem('marblepick.music')==='0') sv='0'; if(sv==='0'||sv==='1'||sv==='2') song=sv; }catch(e){}
+  var bgm = $('bgm'), song = '1', fadeT = 0, SONGS = {'1':'audio/pick.mp3','2':'audio/pick2.mp3','3':'audio/pick3.mp3'};
+  try{ var sv = localStorage.getItem('marblepick.song'); if(sv===null && localStorage.getItem('marblepick.music')==='0') sv='0'; if(sv==='0'||sv==='1'||sv==='2'||sv==='3') song=sv; }catch(e){}
   function paintMusic(){ Array.prototype.forEach.call($('musicSeg').children,function(b){ b.setAttribute('aria-pressed',String(b.dataset.v===song)); }); }
   Array.prototype.forEach.call($('musicSeg').children,function(b){
     b.onclick=function(){ song = b.dataset.v; try{ localStorage.setItem('marblepick.song',song); }catch(e){} paintMusic(); stopMusic(false); if(song!=='0' && S.phase==='run') playMusic(); };
