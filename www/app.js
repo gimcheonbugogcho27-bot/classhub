@@ -366,7 +366,8 @@ if (api) {
 
 /* ---------- 키보드 ---------- */
 document.addEventListener('keydown', e => {
-  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  const tg = (e.composedPath && e.composedPath()[0]) || e.target;   // 구슬 탭(Shadow DOM) 안의 입력칸도 인식
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)) return;
   if (setOpen()) { if (e.key === 'Escape') $('settings').classList.remove('on'); return; }
   if (padOpen()) {
     e.preventDefault();
@@ -387,7 +388,7 @@ document.addEventListener('keydown', e => {
   if (cur === 'timer' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault(); document.querySelector(`#tmAdj [data-add="${e.key === 'ArrowUp' ? 60 : -60}"]`).click();
   }
-  const n = ['1','2','3','4','5','6'].indexOf(e.key);
+  const n = ['1','2','3','4','5','6','7'].indexOf(e.key);
   if (n >= 0 && !(mini && n >= 3)) tabs[n].click();
 });
 
