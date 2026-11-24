@@ -348,3 +348,22 @@
 
   .srcs{margin-top:.6rem;font-size:.85rem;display:flex;flex-direction:column;gap:.15rem;opacity:.9}
   .srcs a{color:inherit;text-decoration:underline;overflow-wrap:anywhere}
+
+  /* 숫자 휠 */
+  .wheels{--ih:clamp(2.8rem,min(9vw,10vh),5rem);display:flex;gap:clamp(.3rem,1.6vw,1.1rem);justify-content:center;align-items:center}
+  .wcol{position:relative;display:flex;align-items:center;gap:.2rem}
+  .wcol::before{content:'';position:absolute;left:-.2rem;right:-.2rem;top:50%;height:var(--ih);transform:translateY(-50%);border-radius:18px;background:var(--glass-strong);border:1px solid var(--border);pointer-events:none}
+  .wheel{position:relative;z-index:1;box-sizing:border-box;height:calc(var(--ih)*3);width:clamp(3.2rem,min(16vw,20vh),7rem);padding:var(--ih) 0;overflow-y:scroll;
+         scroll-snap-type:y mandatory;scrollbar-width:none;overscroll-behavior:contain;touch-action:pan-y;outline:none;cursor:ns-resize;
+         -webkit-mask-image:linear-gradient(transparent,#000 28%,#000 72%,transparent);mask-image:linear-gradient(transparent,#000 28%,#000 72%,transparent)}
+  .wheel::-webkit-scrollbar{display:none}
+  .wheel:focus-visible{box-shadow:0 0 0 2px var(--accent);border-radius:14px}
+  .wi{height:var(--ih);display:flex;align-items:center;justify-content:center;scroll-snap-align:center;scroll-snap-stop:always;font-size:calc(var(--ih)*.6);font-weight:800;color:var(--muted);opacity:.5;user-select:none;-webkit-user-select:none}
+  .wi.sel{color:var(--text);opacity:1}
+  .wu{position:relative;z-index:1;font-weight:800;color:var(--muted);font-size:calc(var(--ih)*.3);margin-right:.2rem}
+  #timer.idle #tmDisp{display:none}
+  #timer:not(.idle) #tmWheel{display:none}
+  body.mini #tmWheel{display:none!important}
+  body.mini #timer.idle #tmDisp{display:block!important}
+  #ring .btn{margin-top:1.2rem}
+  #ring, #ring *{-webkit-app-region:no-drag}   /* 작은 화면(드래그 영역)에서도 눌러서 끌 수 있게 */

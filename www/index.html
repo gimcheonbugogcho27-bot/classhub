@@ -74,6 +74,7 @@
   <section id="timer">
     <div class="card glass">
       <div class="cap" id="tmCap">타이머</div>
+      <div class="wheels" id="tmWheel" aria-label="타이머 시간 맞추기"></div>
       <div class="big num" id="tmDisp" title="눌러서 시간 직접 입력">05:00</div>
       <div class="bar" id="tmBarWrap"><div id="tmBar"></div></div>
       <div class="ctrls">
@@ -106,19 +107,8 @@
   <section id="alarm">
     <div class="card glass">
       <div class="cap">알람 맞추기</div>
-      <div class="setter">
-        <div class="spin">
-          <button class="pill" data-h="1">▲</button>
-          <div class="mid num" id="aH">09</div>
-          <button class="pill" data-h="-1">▼</button>
-        </div>
-        <div class="mid num" style="color:var(--muted)">:</div>
-        <div class="spin">
-          <button class="pill" data-m="5">▲</button>
-          <div class="mid num" id="aM">00</div>
-          <button class="pill" data-m="-5">▼</button>
-        </div>
-      </div>
+      <div class="wheels" id="aWheel" aria-label="알람 시각 맞추기"></div>
+      <div class="cap" id="aPreview"></div>
       <div class="row">
         <input class="memo" id="aMemo" placeholder="메모 (예: 쉬는 시간 끝)" maxlength="20">
         <button class="btn primary" id="aAdd">추가</button>
@@ -229,6 +219,7 @@
   <div class="card glass">
     <div id="ringMsg">시간 끝!</div>
     <div class="cap">화면을 누르면 멈춰요<span id="ringAuto"></span></div>
+    <button class="btn primary" id="ringStop">끄기</button>
   </div>
 </div>
 
@@ -283,6 +274,7 @@
 <div id="toast" class="toast"></div>
 
 <script src="qrcode-lib.js"></script>
+<script src="wheel.js"></script>
 <script src="app.js"></script>
 <script src="qr.js"></script>
 <script src="config.js"></script>

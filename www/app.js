@@ -93,6 +93,7 @@ function startRing(msg) {
 }
 function stopRing() { clearInterval(ringTimer); clearTimeout(ringStop); ringTimer = ringStop = null; $('ring').classList.remove('on'); }
 $('ring').onclick = stopRing;
+$('ringStop').onclick = e => { e.stopPropagation(); stopRing(); };
 
 /* ---------- 시계 + 세계시각 ---------- */
 const CITIES = [
@@ -148,6 +149,12 @@ function drawLaps() {
 
 /* ---------- 타이머 ---------- */
 let tmSet = 300, tmLeft = 300, tmRun = false, tmEnd = 0, lastBeep = -1;
+const tmWheel = makeWheels($('tmWheel'), [{ n: 10, label: '시간' }, { n: 60, label: '분' }, { n: 60, label: '초' }], v => {
+  const t = Math.min(10 * 3600 - 1, v[0] * 3600 + v[1] * 60 + v[2]);
+  tmLeft = tmSet = t; tmRun = false;
+  document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', +x.dataset.set === t));
+  setTmUI(); drawTM();
+});
 const tmRemaining = () => tmRun ? Math.max(0, (tmEnd - Date.now()) / 1000) : tmLeft;
 function fmtTM(sec) {
   sec = Math.ceil(sec);
@@ -170,7 +177,10 @@ function setTmUI() {
   $('tmStart').textContent = tmRun ? '일시정지' : (tmLeft > 0 && tmLeft < tmSet ? '계속' : '시작');
   $('tmStart').className = 'btn ' + (tmRun ? 'pause' : 'primary');
   $('tmPre').classList.toggle('hide', tmRun);
-  $('tmCap').textContent = tmRun ? '진행 중 · 시간을 더하거나 뺄 수 있어요' : '숫자를 누르면 시간을 직접 입력할 수 있어요';
+  const idle = !tmRun && (tmLeft <= 0 || tmLeft >= tmSet);   // 멈춰 있고 아직 시작 전이면 휠로 맞추기
+  $('timer').classList.toggle('idle', idle);
+  if (idle) { const t = Math.round(tmLeft > 0 ? tmLeft : tmSet); tmWheel.set([Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60]); }
+  $('tmCap').textContent = tmRun ? '진행 중 · 시간을 더하거나 뺄 수 있어요' : idle ? '휠을 돌려 시간을 맞추세요 (컴퓨터는 마우스 휠)' : '숫자를 누르면 시간을 직접 입력할 수 있어요';
   $('tmDisp').classList.toggle('editable', !tmRun);
 }
 $('tmStart').onclick = () => {
@@ -311,11 +321,9 @@ nativeInit();
 /* ---------- 알람 ---------- */
 let aH = 9, aM = 0, alarms = store.get('classAlarms', []);
 const saveAlarms = () => store.set('classAlarms', alarms);
-const drawSet = () => { $('aH').textContent = pad(aH); $('aM').textContent = pad(aM); };
-document.querySelectorAll('[data-h]').forEach(b => b.onclick = () => { aH = (aH + +b.dataset.h + 24) % 24; drawSet(); });
-document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { aM = (aM + +b.dataset.m + 60) % 60; drawSet(); });
-$('aH').onclick = () => { aH = (aH + 1) % 24; drawSet(); };   // 숫자 누르면 1씩
-$('aM').onclick = () => { aM = (aM + 1) % 60; drawSet(); };
+const drawSet = () => { $('aPreview').textContent = `${aH < 12 ? '오전' : '오후'} ${aH % 12 || 12}시 ${pad(aM)}분 · 휠을 돌려 맞추세요`; };
+const aWheel = makeWheels($('aWheel'), [{ n: 24, label: '시', pad: true }, { n: 60, label: '분', pad: true }], v => { aH = v[0]; aM = v[1]; drawSet(); });
+aWheel.set([aH, aM]); drawSet();
 $('aAdd').onclick = () => {
   alarms.push({ id: Date.now(), h: aH, m: aM, memo: $('aMemo').value.trim(), on: true, last: '' });
   alarms.sort((a,b) => (a.h*60+a.m) - (b.h*60+b.m));
