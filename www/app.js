@@ -153,7 +153,7 @@ let tmSet = 300, tmLeft = 300, tmRun = false, tmEnd = 0, lastBeep = -1;
 const REP_GAP = 7000;   // 반복할 때 끝 소리가 나는 시간(ms)
 let tmRepeat = store.get('tmRepeat', false), tmRounds = 0, tmGapEnd = 0, gapIv = null;
 /* 안내 글씨: 시작할 때 / 시작하고 N분 뒤에 뜨는 글씨 */
-const tmMsgs = Object.assign({ start: '', list: [] }, store.get('tmMsgs', {}));
+const tmMsgs = Object.assign({ start: '', list: [], gap: 0, gapText: '' }, store.get('tmMsgs', {}));
 let tmFired = new Set(), tmMsgOn = store.get('tmMsgOn', true);
 // 타이머 설정 시간과 같은 'N분 뒤' 글씨가 있으면 끝날 때 '시간 끝!' 대신 그 글씨를 띄운다
 const endText = () => { if (!tmMsgOn) return ''; const x = tmMsgs.list.find(x => x.t && Math.round(x.m * 60) === Math.round(tmSet)); return x ? x.t : ''; };
@@ -163,13 +163,35 @@ function showMsg(t, beepOn) {
   const el = $('tmMsg'); el.textContent = t || ''; el.hidden = !t;
   if (t) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); if (beepOn) try { audio(); beep(880, .15, 0, .3); beep(1175, .2, .18, .3); } catch (e) {} }
 }
-function msgRoundStart() { tmFired = new Set(); showMsg(tmMsgs.start, false); }
+let tmPend = null;   // 글씨 사이 '넘어가는 시간' 동안 기다리는 다음 글씨
+function msgRoundStart() { tmFired = new Set(); tmPend = null; showMsg(tmMsgs.start, false); }
 function msgTick(r) {
-  const el = (tmSet - r);
-  tmMsgs.list.forEach((x, i) => { if (tmMsgOn && x.t && Math.round(x.m * 60) < Math.round(tmSet) && !tmFired.has(i) && el >= x.m * 60) { tmFired.add(i); showMsg(x.t, true); } });
+  const el = (tmSet - r), now = Date.now();
+  if (tmPend && now >= tmPend.until) { showMsg(tmPend.text, true); tmPend = null; }
+  tmMsgs.list.forEach((x, i) => {
+    if (!(tmMsgOn && x.t && Math.round(x.m * 60) < Math.round(tmSet) && !tmFired.has(i) && el >= x.m * 60)) return;
+    tmFired.add(i);
+    if (tmMsgs.gap > 0 && tmMsgs.gapText) { showMsg(tmMsgs.gapText, true); tmPend = { text: x.t, until: now + tmMsgs.gap * 1000 }; }   // 넘어가는 동안 전환 글씨
+    else { tmPend = null; showMsg(x.t, true); }
+  });
 }
+function syncTotal() {
+  if (!$('tmTotM') || document.activeElement === $('tmTotM') || document.activeElement === $('tmTotS')) return;
+  $('tmTotM').value = Math.floor(tmSet / 60); $('tmTotS').value = Math.round(tmSet % 60);
+  $('tmTotM').disabled = $('tmTotS').disabled = tmRun;
+}
+function setTotal() {
+  if (tmRun) return;
+  const t = Math.min(MAX, Math.max(1, Math.round((+$('tmTotM').value || 0) * 60 + (+$('tmTotS').value || 0))));
+  clearGap(); tmSet = tmLeft = t; tmRounds = 0;
+  document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', +x.dataset.set === t));
+  setTmUI(); drawTM();
+}
+$('tmTotM').oninput = $('tmTotS').oninput = setTotal;
+$('tmGap').oninput = e => { tmMsgs.gap = Math.max(0, Math.min(120, +e.target.value || 0)); saveMsgs(); };
+$('tmGapText').oninput = e => { tmMsgs.gapText = e.target.value; saveMsgs(); };
 function renderMsgEditor() {
-  $('tmMsgStart').value = tmMsgs.start;
+  $('tmMsgStart').value = tmMsgs.start; $('tmGap').value = tmMsgs.gap; $('tmGapText').value = tmMsgs.gapText; syncTotal();
   $('tmMsgList').innerHTML = tmMsgs.list.map((x, i) =>
     `<div class="mrow"><input type="number" min="0" max="599" value="${x.m}" data-i="${i}" data-k="m" aria-label="몇 분 뒤"><span>분 뒤</span>` +
     `<input type="text" maxlength="40" value="${x.t.replace(/"/g, '&quot;')}" placeholder="뜨는 글씨" data-i="${i}" data-k="t"><button class="pill minus" data-del="${i}">×</button></div>`).join('');
@@ -197,7 +219,7 @@ function renderRoutines() {
 function applyRoutine(i) {
   const r = tmRoutines[i]; if (!r || tmRun) return;
   clearGap(); tmSet = tmLeft = r.set; tmRounds = 0;
-  tmMsgs.start = r.start; tmMsgs.list = JSON.parse(JSON.stringify(r.list)); saveMsgs(); renderMsgEditor(); showMsg(''); tmFired = new Set();
+  tmMsgs.start = r.start; tmMsgs.list = JSON.parse(JSON.stringify(r.list)); tmMsgs.gap = r.gap || 0; tmMsgs.gapText = r.gapText || ''; saveMsgs(); renderMsgEditor(); showMsg(''); tmFired = new Set();
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', +x.dataset.set === r.set));
   setTmUI(); drawTM();
 }
@@ -206,7 +228,7 @@ $('tmRtList').onclick = e => { const d = e.target.dataset.rtdel; if (d != null) 
 $('tmRtSave').onclick = () => {
   const name = $('tmRtName').value.trim() || `루틴 ${tmRoutines.length + 1}`;
   const set = Math.round(tmRun ? tmSet : (tmLeft >= tmSet || tmLeft <= 0 ? tmSet : tmSet));
-  const item = { name, set, start: tmMsgs.start, list: JSON.parse(JSON.stringify(tmMsgs.list.filter(x => x.t))) };
+  const item = { name, set, gap: tmMsgs.gap, gapText: tmMsgs.gapText, start: tmMsgs.start, list: JSON.parse(JSON.stringify(tmMsgs.list.filter(x => x.t))) };
   const k = tmRoutines.findIndex(r => r.name === name); if (k >= 0) tmRoutines[k] = item; else tmRoutines.push(item);
   saveRt(); $('tmRtName').value = ''; renderRoutines();
 };
@@ -246,7 +268,7 @@ function drawTM() {
         } else if (now >= tmGapEnd) {
           clearGap(); $('ring').classList.remove('on'); tmEnd = now + tmSet * 1000; lastBeep = -1; msgRoundStart(); setTmUI();
         }
-      } else { tmRun = false; tmLeft = 0; showMsg(''); setTmUI(); startRing(endText() || '시간 끝!'); }
+      } else { tmRun = false; tmLeft = 0; tmPend = null; showMsg(''); setTmUI(); startRing(endText() || '시간 끝!'); }
     }
   }
 }
@@ -257,6 +279,7 @@ function setTmUI() {
   const idle = !tmRun && (tmLeft <= 0 || tmLeft >= tmSet);   // 멈춰 있고 아직 시작 전이면 휠로 맞추기
   $('timer').classList.toggle('idle', idle);
   if (idle) { const t = Math.round(tmLeft > 0 ? tmLeft : tmSet); tmWheel.set([Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60]); }
+  syncTotal();
   $('tmRep').classList.toggle('sel', tmRepeat);
   $('tmRep').textContent = tmRepeat ? '🔁 반복 켬' : '🔁 반복 끔';
   $('tmCap').textContent = tmRun ? (tmRepeat ? (tmGapEnd ? `🔔 시간 끝! 잠시 후 ${tmRounds + 1}번째 시작` : `🔁 반복 중 · ${tmRounds + 1}번째 · 멈추려면 일시정지`) : '진행 중 · 시간을 더하거나 뺄 수 있어요') : idle ? '휠을 돌려 맞추세요 · 빨리 돌리면 빨리 넘어가고, 숫자를 누르면 직접 입력해요' : '숫자를 누르면 시간을 직접 입력할 수 있어요';
@@ -275,7 +298,7 @@ $('tmStart').onclick = () => {
   setTmUI(); drawTM();
 };
 $('tmRep').onclick = () => { tmRepeat = !tmRepeat; store.set('tmRepeat', tmRepeat); setTmUI(); };
-$('tmReset').onclick = () => { clearGap(); showMsg(''); tmFired = new Set(); tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
+$('tmReset').onclick = () => { clearGap(); tmPend = null; showMsg(''); tmFired = new Set(); tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
 document.querySelectorAll('#tmPre .pill').forEach(b => b.onclick = () => {
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', x === b));
   tmSet = tmLeft = +b.dataset.set; setTmUI(); drawTM();

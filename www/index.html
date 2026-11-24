@@ -107,10 +107,14 @@
     <div class="row" id="tmRtChips" hidden></div>
     <details class="card glass tmmsgs" id="tmMsgBox">
       <summary>💬 안내 글씨 설정 <button class="pill sel" id="tmMsgOn" type="button">💬 안내 글씨 켬</button></summary>
+      <div class="mlabel">⏱ 총 타이머 시간</div>
+      <div class="mrow"><input type="number" id="tmTotM" min="0" max="599"><span>분</span><input type="number" id="tmTotS" min="0" max="59"><span>초</span></div>
       <label class="mlabel">시작하면 뜨는 글씨<input type="text" id="tmMsgStart" maxlength="40" placeholder="예) 모둠 토의를 시작해요!"></label>
       <div class="mlabel">시작하고 몇 분 뒤에 뜨는 글씨</div>
       <div id="tmMsgList"></div>
       <button class="pill plus" id="tmMsgAdd">+ 글씨 추가</button>
+      <div class="mlabel">🔀 글씨에서 글씨로 넘어갈 때 (0초면 바로 바뀜)</div>
+      <div class="mrow"><input type="number" id="tmGap" min="0" max="120"><span>초 동안</span><input type="text" id="tmGapText" maxlength="40" placeholder="뜨는 글씨 (예: 자리를 옮겨요)"></div>
       <div class="mlabel">📋 루틴 — 지금 시간과 글씨를 저장해 두고 한 번에 불러와요</div>
       <div class="mrow"><input type="text" id="tmRtName" maxlength="20" placeholder="루틴 이름 (예: 모둠 토의)"><button class="pill plus" id="tmRtSave">💾 저장</button></div>
       <div id="tmRtList"></div>
