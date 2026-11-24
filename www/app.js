@@ -150,6 +150,22 @@ function drawLaps() {
 
 /* ---------- 타이머 ---------- */
 let tmSet = 300, tmLeft = 300, tmRun = false, tmEnd = 0, lastBeep = -1;
+/* 타이머 배경 음악: 진행 중에만 잔잔한 10분 곡을 무한 반복 */
+let tmMusic = store.get('tmMusic', true), musFade = null;
+function musVol() { return Math.max(0, Math.min(1, (settings.vol || 80) / 100)) * .5; }
+function syncMusic() {
+  const a = $('tmBgm'); if (!a) return;
+  $('tmMus').textContent = tmMusic ? '🎵 음악 켬' : '🎵 음악 끔'; $('tmMus').classList.toggle('sel', tmMusic);
+  const want = tmMusic && tmRun && !tmGapEnd;
+  clearInterval(musFade);
+  if (want) {
+    if (a.paused) { a.volume = 0; a.play().catch(() => {}); }
+    musFade = setInterval(() => { const v = musVol(); a.volume = Math.min(v, a.volume + .04); if (a.volume >= v) clearInterval(musFade); }, 60);
+  } else if (!a.paused) {
+    musFade = setInterval(() => { a.volume = Math.max(0, a.volume - .08); if (a.volume <= 0) { clearInterval(musFade); a.pause(); } }, 40);
+  }
+}
+$('tmMus').onclick = () => { tmMusic = !tmMusic; store.set('tmMusic', tmMusic); syncMusic(); };
 const REP_GAP = 7000;   // 반복할 때 끝 소리가 나는 시간(ms)
 let tmRepeat = store.get('tmRepeat', false), tmRounds = 0, tmGapEnd = 0, gapIv = null;
 /* 안내 글씨: 시작할 때 / 시작하고 N분 뒤에 뜨는 글씨 */
@@ -284,7 +300,7 @@ function setTmUI() {
   const idle = !tmRun && (tmLeft <= 0 || tmLeft >= tmSet);   // 멈춰 있고 아직 시작 전이면 휠로 맞추기
   $('timer').classList.toggle('idle', idle);
   if (idle) { const t = Math.round(tmLeft > 0 ? tmLeft : tmSet); tmWheel.set([Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60]); }
-  syncTotal();
+  syncTotal(); syncMusic();
   $('tmRep').classList.toggle('sel', tmRepeat);
   $('tmRep').textContent = tmRepeat ? '🔁 반복 켬' : '🔁 반복 끔';
   $('tmCap').textContent = tmRun ? (tmRepeat ? (tmGapEnd ? `🔔 시간 끝! 잠시 후 ${tmRounds + 1}번째 시작` : `🔁 반복 중 · ${tmRounds + 1}번째 · 멈추려면 일시정지`) : '진행 중 · 시간을 더하거나 뺄 수 있어요') : idle ? '휠을 돌려 맞추세요 · 빨리 돌리면 빨리 넘어가고, 숫자를 누르면 직접 입력해요' : '숫자를 누르면 시간을 직접 입력할 수 있어요';
@@ -303,7 +319,7 @@ $('tmStart').onclick = () => {
   setTmUI(); drawTM();
 };
 $('tmRep').onclick = () => { tmRepeat = !tmRepeat; store.set('tmRepeat', tmRepeat); setTmUI(); };
-$('tmReset').onclick = () => { clearGap(); tmPend = null; hideTrans(); showMsg(''); tmFired = new Set(); tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
+$('tmReset').onclick = () => { try { $('tmBgm').currentTime = 0; } catch (e) {} clearGap(); tmPend = null; hideTrans(); showMsg(''); tmFired = new Set(); tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
 document.querySelectorAll('#tmPre .pill').forEach(b => b.onclick = () => {
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', x === b));
   tmSet = tmLeft = +b.dataset.set; setTmUI(); drawTM();
