@@ -181,10 +181,10 @@ $('tmMus').onclick = () => { tmMusic = !tmMusic; store.set('tmMusic', tmMusic); 
 const REP_GAP = 7000;   // 반복할 때 끝 소리가 나는 시간(ms)
 let tmRepeat = store.get('tmRepeat', false), tmRounds = 0, tmGapEnd = 0, gapIv = null;
 /* 안내 글씨: 시작할 때 / 시작하고 N분 뒤에 뜨는 글씨 */
-const tmMsgs = Object.assign({ start: '', list: [], gap: 0, gapText: '', gapIncl: true }, store.get('tmMsgs', {}));
+const tmMsgs = Object.assign({ start: '', list: [], gap: 0, gapText: '', gapIncl: true, endText: '' }, store.get('tmMsgs', {}));
 let tmFired = new Set(), tmMsgOn = store.get('tmMsgOn', true);
 // 타이머 설정 시간과 같은 'N분 뒤' 글씨가 있으면 끝날 때 '시간 끝!' 대신 그 글씨를 띄운다
-const endText = () => { if (!tmMsgOn) return ''; const x = tmMsgs.list.find(x => x.t && Math.round(x.m * 60) === Math.round(tmSet)); return x ? x.t : ''; };
+const endText = () => { if (!tmMsgOn) return ''; if ((tmMsgs.endText || '').trim()) return tmMsgs.endText.trim(); const x = tmMsgs.list.find(x => x.t && Math.round(x.m * 60) === Math.round(tmSet)); return x ? x.t : ''; };
 if (!Array.isArray(tmMsgs.starts)) tmMsgs.starts = tmMsgs.start ? [{ t: tmMsgs.start, s: 5 }] : [];   // 예전 '시작 글씨 1개' → 목록으로
 if (tmMsgs.startFull == null) tmMsgs.startFull = false;
 const saveMsgs = () => store.set('tmMsgs', tmMsgs);
@@ -246,7 +246,7 @@ $('tmGapText').oninput = e => { tmMsgs.gapText = e.target.value; saveMsgs(); };
 function renderMsgEditor() {
   $('tmStartList').innerHTML = tmMsgs.starts.map((x, i) =>
     `<div class="mrow"><input type="text" maxlength="40" value="${escH(x.t)}" placeholder="시작하면 뜨는 글씨" data-i="${i}" data-k="t"><input type="number" min="1" max="600" value="${x.s}" data-i="${i}" data-k="s" aria-label="몇 초 동안"><span>초</span><button class="pill minus" data-sdel="${i}">×</button></div>`).join('');
-  $('tmStartFull').checked = !!tmMsgs.startFull;
+  $('tmStartFull').checked = !!tmMsgs.startFull; $('tmEndText').value = tmMsgs.endText || '';
   $('tmGap').value = tmMsgs.gap; $('tmGapText').value = tmMsgs.gapText; $('tmGapIncl').checked = tmMsgs.gapIncl !== false; syncTotal();
   $('tmMsgList').innerHTML = tmMsgs.list.map((x, i) =>
     `<div class="mrow"><input type="number" min="0" max="599" value="${x.m}" data-i="${i}" data-k="m" aria-label="몇 분 뒤"><span>분 뒤</span>` +
@@ -280,6 +280,7 @@ $('tmPreview').onclick = () => {
 $('tmStartList').oninput = e => { const i = +e.target.dataset.i, k = e.target.dataset.k; if (k) { tmMsgs.starts[i][k] = k === 's' ? Math.max(1, +e.target.value || 1) : e.target.value; saveMsgs(); } };
 $('tmStartList').onclick = e => { const d = e.target.dataset.sdel; if (d != null) { tmMsgs.starts.splice(+d, 1); saveMsgs(); renderMsgEditor(); } };
 $('tmStartAdd').onclick = () => { tmMsgs.starts.push({ t: '', s: 5 }); saveMsgs(); renderMsgEditor(); };
+$('tmEndText').oninput = e => { tmMsgs.endText = e.target.value; saveMsgs(); };
 $('tmStartFull').onchange = e => { tmMsgs.startFull = e.target.checked; saveMsgs(); };
 $('tmMsgList').oninput = e => { const i = +e.target.dataset.i, k = e.target.dataset.k; if (k) { tmMsgs.list[i][k] = k === 'm' ? Math.max(0, +e.target.value || 0) : e.target.value; saveMsgs(); } };
 $('tmMsgList').onclick = e => { const d = e.target.dataset.del; if (d != null) { tmMsgs.list.splice(+d, 1); saveMsgs(); renderMsgEditor(); } };
@@ -296,7 +297,7 @@ function renderRoutines() {
 function applyRoutine(i) {
   const r = tmRoutines[i]; if (!r || tmRun) return;
   clearGap(); tmSet = tmLeft = r.set; tmRounds = 0;
-  tmMsgs.starts = JSON.parse(JSON.stringify(r.starts || (r.start ? [{ t: r.start, s: 5 }] : []))); tmMsgs.startFull = !!r.startFull; tmMsgs.list = JSON.parse(JSON.stringify(r.list)); tmMsgs.gap = r.gap || 0; tmMsgs.gapText = r.gapText || ''; tmMsgs.gapIncl = r.gapIncl !== false; saveMsgs(); renderMsgEditor(); showMsg(''); tmFired = new Set();
+  tmMsgs.starts = JSON.parse(JSON.stringify(r.starts || (r.start ? [{ t: r.start, s: 5 }] : []))); tmMsgs.startFull = !!r.startFull; tmMsgs.endText = r.endText || ''; tmMsgs.list = JSON.parse(JSON.stringify(r.list)); tmMsgs.gap = r.gap || 0; tmMsgs.gapText = r.gapText || ''; tmMsgs.gapIncl = r.gapIncl !== false; saveMsgs(); renderMsgEditor(); showMsg(''); tmFired = new Set();
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', +x.dataset.set === r.set));
   setTmUI(); drawTM();
 }
@@ -305,7 +306,7 @@ $('tmRtList').onclick = e => { const d = e.target.dataset.rtdel; if (d != null) 
 $('tmRtSave').onclick = () => {
   const name = $('tmRtName').value.trim() || `루틴 ${tmRoutines.length + 1}`;
   const set = Math.round(tmRun ? tmSet : (tmLeft >= tmSet || tmLeft <= 0 ? tmSet : tmSet));
-  const item = { name, set, gap: tmMsgs.gap, gapText: tmMsgs.gapText, gapIncl: tmMsgs.gapIncl !== false, starts: JSON.parse(JSON.stringify(startSeq())), startFull: !!tmMsgs.startFull, list: JSON.parse(JSON.stringify(tmMsgs.list.filter(x => x.t))) };
+  const item = { name, set, gap: tmMsgs.gap, gapText: tmMsgs.gapText, gapIncl: tmMsgs.gapIncl !== false, starts: JSON.parse(JSON.stringify(startSeq())), startFull: !!tmMsgs.startFull, endText: tmMsgs.endText || '', list: JSON.parse(JSON.stringify(tmMsgs.list.filter(x => x.t))) };
   const k = tmRoutines.findIndex(r => r.name === name); if (k >= 0) tmRoutines[k] = item; else tmRoutines.push(item);
   saveRt(); $('tmRtName').value = ''; renderRoutines();
 };
