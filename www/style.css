@@ -420,3 +420,6 @@
   #tmSong{appearance:auto;max-width:11rem}
   .tmmsgs .mlabel.chk{display:flex;gap:.5rem;align-items:flex-start;font-weight:500;font-size:.88rem}
   .tmmsgs .mlabel.chk input{width:auto;margin-top:.15rem}
+  .musvol{display:flex;align-items:center;gap:.4rem;font-size:.95rem}
+  .musvol input{width:7.5rem;accent-color:var(--accent)}
+  .musvol b{min-width:1.8rem;text-align:right;font-variant-numeric:tabular-nums}

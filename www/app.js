@@ -152,7 +152,8 @@ function drawLaps() {
 let tmSet = 300, tmLeft = 300, tmRun = false, tmEnd = 0, lastBeep = -1;
 /* 타이머 배경 음악: 진행 중에만 잔잔한 10분 곡을 무한 반복 */
 let tmMusic = store.get('tmMusic', true), musFade = null;
-function musVol() { return Math.max(0, Math.min(1, (settings.vol || 80) / 100)) * .5; }
+let tmMusVol = Math.max(0, Math.min(100, +store.get('tmMusVol', 40)));   // 음악 크기 0~100 (알람 볼륨과 따로)
+function musVol() { return tmMusVol / 100; }
 function syncMusic() {
   const a = $('tmBgm'); if (!a) return;
   $('tmMus').textContent = tmMusic ? '🎹 피아노 켬' : '🎹 피아노 끔'; $('tmMus').classList.toggle('sel', tmMusic);
@@ -169,6 +170,11 @@ $('tmSong').value = store.get('tmSong', '1'); $('tmBgm').src = `audio/piano${$('
 $('tmSong').onchange = () => {
   store.set('tmSong', $('tmSong').value); const a = $('tmBgm'), was = !a.paused;
   clearInterval(musFade); a.pause(); a.src = `audio/piano${$('tmSong').value}.mp3`; a.currentTime = 0; if (was) { a.volume = 0; syncMusic(); }
+};
+$('tmMusVol').value = tmMusVol; $('tmMusVolNum').textContent = tmMusVol;
+$('tmMusVol').oninput = e => {
+  tmMusVol = +e.target.value; store.set('tmMusVol', tmMusVol); $('tmMusVolNum').textContent = tmMusVol;
+  const a = $('tmBgm'); if (!a.paused) { clearInterval(musFade); a.volume = musVol(); }   // 듣는 중에도 바로 반영
 };
 $('tmMus').onclick = () => { tmMusic = !tmMusic; store.set('tmMusic', tmMusic); syncMusic(); };
 const REP_GAP = 7000;   // 반복할 때 끝 소리가 나는 시간(ms)
