@@ -423,3 +423,9 @@
   .musvol{display:flex;align-items:center;gap:.4rem;font-size:.95rem}
   .musvol input{width:7.5rem;accent-color:var(--accent)}
   .musvol b{min-width:1.8rem;text-align:right;font-variant-numeric:tabular-nums}
+  body{--sz:1;--rsz:1}
+  body[data-msgsz="2"]{--sz:1.35;--rsz:1.2}
+  body[data-msgsz="3"]{--sz:1.8;--rsz:1.4}
+  .tmmsg{font-size:calc(clamp(1.3rem,5vw,2.2rem) * var(--sz))}
+  #ringMsg{font-size:calc(clamp(3rem,min(12vw,18vh),12rem) * var(--rsz));word-break:keep-all}
+  body.mini #ringMsg{font-size:calc(min(14vw,26vh) * var(--rsz))}

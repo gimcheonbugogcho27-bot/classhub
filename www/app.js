@@ -91,7 +91,8 @@ function startRing(msg) {
   clearTimeout(ringStop);
   if (settings.autoStop) ringStop = setTimeout(stopRing, settings.autoStop * 1000);   // 자동 멈춤
 }
-function stopRing() { if (typeof tmTransRing !== 'undefined') tmTransRing = false; if (typeof tmGapEnd !== 'undefined' && tmGapEnd) tmGapEnd = 1;   // 반복 알림 중 누르면 바로 다음 회차
+function stopRing() { try { cancelPreview(); } catch (e) {}
+  if (typeof tmTransRing !== 'undefined') tmTransRing = false; if (typeof tmGapEnd !== 'undefined' && tmGapEnd) tmGapEnd = 1;   // 반복 알림 중 누르면 바로 다음 회차
   clearInterval(ringTimer); clearTimeout(ringStop); ringTimer = ringStop = null; $('ring').classList.remove('on'); }
 $('ring').onclick = stopRing;
 $('ringStop').onclick = e => { e.stopPropagation(); stopRing(); };
@@ -258,6 +259,24 @@ function setMsgOn(v) {
 }
 $('tmMsgOn').onclick = e => { e.preventDefault(); e.stopPropagation(); setMsgOn(!tmMsgOn); };
 setMsgOn(tmMsgOn);
+/* 글씨 크기 */
+let tmMsgSz = store.get('tmMsgSz', '1');
+function applySz() { document.body.dataset.msgsz = tmMsgSz; $('tmMsgSz').value = tmMsgSz; }
+$('tmMsgSz').onchange = e => { tmMsgSz = e.target.value; store.set('tmMsgSz', tmMsgSz); applySz(); };
+applySz();
+/* 미리보기: 시작 → 전환 → N분 뒤 → 끝 글씨를 2.5초씩 전체 화면으로 훑어보기 */
+let tmPrevTimer = null;
+function cancelPreview() { if (tmPrevTimer) { clearInterval(tmPrevTimer); tmPrevTimer = null; } }
+$('tmPreview').onclick = () => {
+  if (tmRun) return;
+  const steps = startSeq().map(x => x.t);
+  tmMsgs.list.filter(x => x.t && Math.round(x.m * 60) < Math.round(tmSet)).sort((a, b) => a.m - b.m)
+    .forEach(x => { if (tmMsgs.gap > 0 && tmMsgs.gapText) steps.push(tmMsgs.gapText); steps.push(x.t); });
+  steps.push(endText() || '시간 끝!');
+  let i = 0; cancelPreview();
+  const show = () => { $('ringMsg').textContent = steps[i]; $('ringAuto').textContent = ` · 미리보기 ${i + 1}/${steps.length} (누르면 닫혀요)`; $('ring').classList.add('on'); };
+  show(); tmPrevTimer = setInterval(() => { i++; if (i >= steps.length) { cancelPreview(); $('ring').classList.remove('on'); } else show(); }, 2500);
+};
 $('tmStartList').oninput = e => { const i = +e.target.dataset.i, k = e.target.dataset.k; if (k) { tmMsgs.starts[i][k] = k === 's' ? Math.max(1, +e.target.value || 1) : e.target.value; saveMsgs(); } };
 $('tmStartList').onclick = e => { const d = e.target.dataset.sdel; if (d != null) { tmMsgs.starts.splice(+d, 1); saveMsgs(); renderMsgEditor(); } };
 $('tmStartAdd').onclick = () => { tmMsgs.starts.push({ t: '', s: 5 }); saveMsgs(); renderMsgEditor(); };
