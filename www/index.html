@@ -112,7 +112,10 @@
       <summary>💬 안내 글씨 설정 <button class="pill sel" id="tmMsgOn" type="button">💬 안내 글씨 켬</button></summary>
       <div class="mlabel">⏱ 총 타이머 시간</div>
       <div class="mrow"><input type="number" id="tmTotM" min="0" max="599"><span>분</span><input type="number" id="tmTotS" min="0" max="59"><span>초</span></div>
-      <label class="mlabel">시작하면 뜨는 글씨<input type="text" id="tmMsgStart" maxlength="40" placeholder="예) 모둠 토의를 시작해요!"></label>
+      <div class="mlabel">시작하자마자 뜨는 글씨 (여러 개면 순서대로, 각각 몇 초 동안)</div>
+      <div id="tmStartList"></div>
+      <button class="pill plus" id="tmStartAdd">+ 시작 글씨 추가</button>
+      <label class="mlabel chk"><input type="checkbox" id="tmStartFull"> 시작 글씨를 화면 전체로 크게 보여주기</label>
       <div class="mlabel">시작하고 몇 분 뒤에 뜨는 글씨</div>
       <div id="tmMsgList"></div>
       <button class="pill plus" id="tmMsgAdd">+ 글씨 추가</button>
