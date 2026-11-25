@@ -174,7 +174,7 @@ $('tmMus').onclick = () => { tmMusic = !tmMusic; store.set('tmMusic', tmMusic); 
 const REP_GAP = 7000;   // 반복할 때 끝 소리가 나는 시간(ms)
 let tmRepeat = store.get('tmRepeat', false), tmRounds = 0, tmGapEnd = 0, gapIv = null;
 /* 안내 글씨: 시작할 때 / 시작하고 N분 뒤에 뜨는 글씨 */
-const tmMsgs = Object.assign({ start: '', list: [], gap: 0, gapText: '' }, store.get('tmMsgs', {}));
+const tmMsgs = Object.assign({ start: '', list: [], gap: 0, gapText: '', gapIncl: true }, store.get('tmMsgs', {}));
 let tmFired = new Set(), tmMsgOn = store.get('tmMsgOn', true);
 // 타이머 설정 시간과 같은 'N분 뒤' 글씨가 있으면 끝날 때 '시간 끝!' 대신 그 글씨를 띄운다
 const endText = () => { if (!tmMsgOn) return ''; const x = tmMsgs.list.find(x => x.t && Math.round(x.m * 60) === Math.round(tmSet)); return x ? x.t : ''; };
@@ -184,20 +184,24 @@ function showMsg(t, beepOn) {
   const el = $('tmMsg'); el.textContent = t || ''; el.hidden = !t;
   if (t) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); if (beepOn) try { audio(); beep(880, .15, 0, .3); beep(1175, .2, .18, .3); } catch (e) {} }
 }
+let tmFreezeUntil = 0, tmFrozenMs = 0;
 let tmPend = null, tmTransRing = false;
 function hideTrans() { if (!tmTransRing) return; tmTransRing = false; if (!ringTimer && !tmGapEnd) $('ring').classList.remove('on'); }
 function showTransRing(text, sec) {     // 글씨 사이 전환: 시간 끝처럼 전체 화면으로
   if (ringTimer || tmGapEnd) return;     // 종료 알림이 이미 떠 있으면 건드리지 않음
   $('ringMsg').textContent = text; $('ringAuto').textContent = ` · ${sec}초 뒤 다음 글씨`; $('ring').classList.add('on'); tmTransRing = true;
 }   // 글씨 사이 '넘어가는 시간' 동안 기다리는 다음 글씨
-function msgRoundStart() { tmFired = new Set(); tmPend = null; hideTrans(); showMsg(tmMsgs.start, false); }
+function msgRoundStart() { tmFired = new Set(); tmPend = null; tmFreezeUntil = 0; hideTrans(); showMsg(tmMsgs.start, false); }
 function msgTick(r) {
   const el = (tmSet - r), now = Date.now();
   if (tmPend && now >= tmPend.until) { hideTrans(); showMsg(tmPend.text, true); tmPend = null; }
   tmMsgs.list.forEach((x, i) => {
     if (!(tmMsgOn && x.t && Math.round(x.m * 60) < Math.round(tmSet) && !tmFired.has(i) && el >= x.m * 60)) return;
     tmFired.add(i);
-    if (tmMsgs.gap > 0 && tmMsgs.gapText) { showMsg(tmMsgs.gapText, true); showTransRing(tmMsgs.gapText, tmMsgs.gap); tmPend = { text: x.t, until: now + tmMsgs.gap * 1000 }; }   // 넘어가는 동안 전환 글씨
+    if (tmMsgs.gap > 0 && tmMsgs.gapText) {
+      if (!tmMsgs.gapIncl) { tmFrozenMs = Math.max(0, tmEnd - now); tmFreezeUntil = now + tmMsgs.gap * 1000; }   // 전환 시간은 총 시간에서 빼고 멈춤
+      showMsg(tmMsgs.gapText, true); showTransRing(tmMsgs.gapText, tmMsgs.gap); tmPend = { text: x.t, until: now + tmMsgs.gap * 1000 };   // 넘어가는 동안 전환 글씨
+    }
     else { tmPend = null; showMsg(x.t, true); }
   });
 }
@@ -215,16 +219,17 @@ function setTotal() {
 }
 $('tmTotM').oninput = $('tmTotS').oninput = setTotal;
 $('tmGap').oninput = e => { tmMsgs.gap = Math.max(0, Math.min(120, +e.target.value || 0)); saveMsgs(); };
+$('tmGapIncl').onchange = e => { tmMsgs.gapIncl = e.target.checked; saveMsgs(); };
 $('tmGapText').oninput = e => { tmMsgs.gapText = e.target.value; saveMsgs(); };
 function renderMsgEditor() {
-  $('tmMsgStart').value = tmMsgs.start; $('tmGap').value = tmMsgs.gap; $('tmGapText').value = tmMsgs.gapText; syncTotal();
+  $('tmMsgStart').value = tmMsgs.start; $('tmGap').value = tmMsgs.gap; $('tmGapText').value = tmMsgs.gapText; $('tmGapIncl').checked = tmMsgs.gapIncl !== false; syncTotal();
   $('tmMsgList').innerHTML = tmMsgs.list.map((x, i) =>
     `<div class="mrow"><input type="number" min="0" max="599" value="${x.m}" data-i="${i}" data-k="m" aria-label="몇 분 뒤"><span>분 뒤</span>` +
     `<input type="text" maxlength="40" value="${x.t.replace(/"/g, '&quot;')}" placeholder="뜨는 글씨" data-i="${i}" data-k="t"><button class="pill minus" data-del="${i}">×</button></div>`).join('');
 }
 function setMsgOn(v) {
   tmMsgOn = v; store.set('tmMsgOn', v); $('tmMsgOn').textContent = v ? '💬 안내 글씨 켬' : '💬 안내 글씨 끔'; $('tmMsgOn').classList.toggle('sel', v);
-  $('tmMsgBox').classList.toggle('off', !v); if (!v) { showMsg(''); tmPend = null; hideTrans(); } else if (tmRun) showMsg(tmMsgs.start);
+  $('tmMsgBox').classList.toggle('off', !v); if (!v) { showMsg(''); tmPend = null; tmFreezeUntil = 0; hideTrans(); } else if (tmRun) showMsg(tmMsgs.start);
   if (typeof nativeSchedule === 'function' && tmRun) nativeSchedule();
 }
 $('tmMsgOn').onclick = e => { e.preventDefault(); e.stopPropagation(); setMsgOn(!tmMsgOn); };
@@ -240,12 +245,12 @@ const escH = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;'
 function renderRoutines() {
   $('tmRtChips').hidden = !tmRoutines.length;
   $('tmRtChips').innerHTML = tmRoutines.map((r, i) => `<button class="pill" data-rt="${i}">📋 ${escH(r.name)} · ${fmtTM(r.set)}</button>`).join('');
-  $('tmRtList').innerHTML = tmRoutines.map((r, i) => `<div class="mrow"><span style="flex:1">📋 ${escH(r.name)} (${fmtTM(r.set)}, 글씨 ${(r.start ? 1 : 0) + r.list.filter(x => x.t).length}개)</span><button class="pill minus" data-rtdel="${i}">×</button></div>`).join('');
+  $('tmRtList').innerHTML = tmRoutines.map((r, i) => `<div class="mrow"><span style="flex:1">📋 ${escH(r.name)} (${fmtTM(r.set)}, 글씨 ${(r.start ? 1 : 0) + r.list.filter(x => x.t).length}개${r.gap ? `, 전환 ${r.gap}초 ${r.gapIncl === false ? '제외' : '포함'}` : ''})</span><button class="pill minus" data-rtdel="${i}">×</button></div>`).join('');
 }
 function applyRoutine(i) {
   const r = tmRoutines[i]; if (!r || tmRun) return;
   clearGap(); tmSet = tmLeft = r.set; tmRounds = 0;
-  tmMsgs.start = r.start; tmMsgs.list = JSON.parse(JSON.stringify(r.list)); tmMsgs.gap = r.gap || 0; tmMsgs.gapText = r.gapText || ''; saveMsgs(); renderMsgEditor(); showMsg(''); tmFired = new Set();
+  tmMsgs.start = r.start; tmMsgs.list = JSON.parse(JSON.stringify(r.list)); tmMsgs.gap = r.gap || 0; tmMsgs.gapText = r.gapText || ''; tmMsgs.gapIncl = r.gapIncl !== false; saveMsgs(); renderMsgEditor(); showMsg(''); tmFired = new Set();
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', +x.dataset.set === r.set));
   setTmUI(); drawTM();
 }
@@ -254,7 +259,7 @@ $('tmRtList').onclick = e => { const d = e.target.dataset.rtdel; if (d != null) 
 $('tmRtSave').onclick = () => {
   const name = $('tmRtName').value.trim() || `루틴 ${tmRoutines.length + 1}`;
   const set = Math.round(tmRun ? tmSet : (tmLeft >= tmSet || tmLeft <= 0 ? tmSet : tmSet));
-  const item = { name, set, gap: tmMsgs.gap, gapText: tmMsgs.gapText, start: tmMsgs.start, list: JSON.parse(JSON.stringify(tmMsgs.list.filter(x => x.t))) };
+  const item = { name, set, gap: tmMsgs.gap, gapText: tmMsgs.gapText, gapIncl: tmMsgs.gapIncl !== false, start: tmMsgs.start, list: JSON.parse(JSON.stringify(tmMsgs.list.filter(x => x.t))) };
   const k = tmRoutines.findIndex(r => r.name === name); if (k >= 0) tmRoutines[k] = item; else tmRoutines.push(item);
   saveRt(); $('tmRtName').value = ''; renderRoutines();
 };
@@ -266,7 +271,15 @@ const tmWheel = makeWheels($('tmWheel'), [{ n: 10, label: '시간' }, { n: 60, l
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', +x.dataset.set === t));
   setTmUI(); drawTM();
 });
-const tmRemaining = () => tmRun ? Math.max(0, (tmEnd - Date.now()) / 1000) : tmLeft;
+// '총 시간에 포함 안 함' 이면 전환 글씨가 뜨는 동안 타이머를 멈춘다
+const tmRemaining = () => {
+  if (!tmRun) return tmLeft;
+  if (tmFreezeUntil) { const n = Date.now(); if (n < tmFreezeUntil) tmEnd = n + tmFrozenMs; else tmFreezeUntil = 0; }
+  return Math.max(0, (tmEnd - Date.now()) / 1000);
+};
+const gapActive = () => tmMsgOn && tmMsgs.gap > 0 && !!tmMsgs.gapText;
+const extraGapMs = () => (!tmMsgs.gapIncl && gapActive())    // 안드로이드 알림: 앞으로 멈추게 될 전환 시간 합
+  ? tmMsgs.list.filter((x, i) => x.t && Math.round(x.m * 60) < Math.round(tmSet) && !tmFired.has(i)).length * tmMsgs.gap * 1000 : 0;
 function fmtTM(sec) {
   sec = Math.ceil(sec);
   const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
@@ -294,7 +307,7 @@ function drawTM() {
         } else if (now >= tmGapEnd) {
           clearGap(); $('ring').classList.remove('on'); tmEnd = now + tmSet * 1000; lastBeep = -1; msgRoundStart(); setTmUI();
         }
-      } else { tmRun = false; tmLeft = 0; tmPend = null; tmTransRing = false; showMsg(''); setTmUI(); startRing(endText() || '시간 끝!'); }
+      } else { tmRun = false; tmLeft = 0; tmFreezeUntil = 0; tmPend = null; tmTransRing = false; showMsg(''); setTmUI(); startRing(endText() || '시간 끝!'); }
     }
   }
 }
@@ -314,7 +327,7 @@ function setTmUI() {
 $('tmStart').onclick = () => {
   audio();
   clearGap(); hideTrans();
-  if (tmRun) { tmLeft = tmRemaining(); tmRun = false; }
+  if (tmRun) { tmLeft = tmRemaining(); tmRun = false; tmFreezeUntil = 0; }
   else {
     if (tmLeft <= 0) tmLeft = tmSet;
     if (tmLeft <= 0) return;
@@ -324,7 +337,7 @@ $('tmStart').onclick = () => {
   setTmUI(); drawTM();
 };
 $('tmRep').onclick = () => { tmRepeat = !tmRepeat; store.set('tmRepeat', tmRepeat); setTmUI(); };
-$('tmReset').onclick = () => { try { $('tmBgm').currentTime = 0; } catch (e) {} clearGap(); tmPend = null; hideTrans(); showMsg(''); tmFired = new Set(); tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
+$('tmReset').onclick = () => { tmFreezeUntil = 0; try { $('tmBgm').currentTime = 0; } catch (e) {} clearGap(); tmPend = null; hideTrans(); showMsg(''); tmFired = new Set(); tmRun = false; tmRounds = 0; tmLeft = tmSet; setTmUI(); drawTM(); };
 document.querySelectorAll('#tmPre .pill').forEach(b => b.onclick = () => {
   document.querySelectorAll('#tmPre .pill').forEach(x => x.classList.toggle('sel', x === b));
   tmSet = tmLeft = +b.dataset.set; setTmUI(); drawTM();
@@ -440,10 +453,10 @@ async function nativeSchedule() {    // 앱이 화면에서 사라질 때 예약
       schedule: { on: { hour: a.h, minute: a.m }, allowWhileIdle: true }
     }));
     if (tmRun && tmEnd > Date.now() + 1000) {
-      const times = tmRepeat && tmSet >= 5 ? Math.min(60, Math.floor(7200 / (tmSet + 7))) : 1;   // 반복이면 앞으로 2시간 안에서 최대 60번
+      const xg = extraGapMs(), times = tmRepeat && tmSet >= 5 ? Math.min(60, Math.floor(7200 / (tmSet + 7 + xg / 1000))) : 1;   // 반복이면 앞으로 2시간 안에서 최대 60번
       for (let k = 0; k < Math.max(1, times); k++) list.push({
         id: k ? 200 + k : 1, title: k ? `🔁 ${k + 1}번째 ${endText() || '시간 끝!'}` : `⏳ ${endText() || '시간 끝!'}`, body: tmRepeat ? '반복 타이머' : '타이머가 끝났어요', channelId: ch, smallIcon: 'ic_stat_timer', iconColor: '#5b5bf0',
-        schedule: { at: new Date(tmEnd + k * (tmSet + 7) * 1000), allowWhileIdle: true }
+        schedule: { at: new Date(tmEnd + xg + k * (tmSet + 7 + xg / 1000) * 1000), allowWhileIdle: true }
       });
     }
     if (list.length) await LN.schedule({ notifications: list });
