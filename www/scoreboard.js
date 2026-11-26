@@ -67,12 +67,23 @@
     else if (act === 'del') { if (!confirm('"' + b.title + '" 점수판을 삭제할까요?')) return; S.boards.splice(S.boards.indexOf(b), 1); if (big === b.id) big = null; }
     save(); render();
   });
+  // 이름·제목은 글자를 칠 때마다 바로 저장하고, 화면을 다시 그리지 않아요 (그래야 칸이 안 풀리고, 바로 다음 버튼이 눌려요)
+  root.addEventListener('input', function (e) {
+    var t = e.target, b = boardOf(t); if (!b) return;
+    if (t.dataset.k === 'title') { b.title = t.value; save(); }
+    else if (t.dataset.k === 'name') { var row = t.closest('.sbrow'); b.items[+row.dataset.i].n = t.value; save(); }
+  });
   root.addEventListener('change', function (e) {
     var t = e.target, b = boardOf(t); if (!b) return;
     if (t.dataset.k === 'step') { b.step = +t.value || 1; save(); }
-    else if (t.dataset.k === 'title') { b.title = t.value.trim() || '점수판'; save(); }
-    else if (t.dataset.k === 'name') { var row = t.closest('.sbrow'); b.items[+row.dataset.i].n = t.value.trim() || '이름'; save(); render(); }
+    else if (t.dataset.k === 'title') { b.title = t.value.trim() || '점수판'; t.value = b.title; save(); }
+    else if (t.dataset.k === 'name') { var row = t.closest('.sbrow'), it = b.items[+row.dataset.i]; it.n = t.value.trim() || '이름'; t.value = it.n; save(); }
   });
+  var justFocus = false;
+  root.addEventListener('mousedown', function (e) { var t = e.target; justFocus = !!(t.dataset && (t.dataset.k === 'name' || t.dataset.k === 'title') && document.activeElement !== t); });
+  root.addEventListener('mouseup', function (e) { if (justFocus) { e.preventDefault(); justFocus = false; try { e.target.select(); } catch (x) {} } });   // 눌러서 들어가면 전체 선택 → 바로 새 이름 입력
+  root.addEventListener('focusin', function (e) { var t = e.target; if (t.dataset && (t.dataset.k === 'name' || t.dataset.k === 'title')) setTimeout(function () { try { t.select(); } catch (x) {} }, 0); });   // Tab으로 들어와도 전체 선택
+  root.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.dataset && (e.target.dataset.k === 'name' || e.target.dataset.k === 'title') && !e.isComposing) e.target.blur(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && big) { big = null; render(); } });
 
   function add(kind) {
