@@ -40,6 +40,7 @@ $('themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme ==
 const tabs = [...document.querySelectorAll('#tabs button')];
 function showTab(id) {
   tabs.forEach(b => b.classList.toggle('on', b.dataset.t === id));
+  try { const on = tabs.find(b => b.dataset.t === id); on && on.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) {}
   document.querySelectorAll('main section').forEach(s => s.classList.toggle('on', s.id === id));
   store.set('lastTab', id);
   document.dispatchEvent(new CustomEvent('tabchange', { detail: id }));
