@@ -82,6 +82,8 @@ textarea{resize:vertical;min-height:84px}
 .prow .clr{padding:4px 8px;min-height:36px;font-size:12px;color:var(--muted)}
 .hint{color:var(--muted);font-size:13px;margin:0}
 .meta{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.prow input.atd{flex:none;width:20px;height:20px;min-height:0;accent-color:var(--accent)}
+.prow.off .av,.prow.off .t,.prow.off input[type=text]{opacity:.35;text-decoration:line-through}
 .count{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
 .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
 .chk input{width:18px;height:18px;accent-color:var(--accent)}
@@ -204,8 +206,10 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
       </div>
       <div class="bar">
         <button type="button" id="rosterReload">명단 다시 불러오기</button>
+        <button type="button" id="allOn">모두 참여</button>
+        <button type="button" id="allOff">모두 빼기</button>
       </div>
-      <p class="hint" id="rosterMsg" role="status">우리반 명단은 GitHub 저장소(guselpick)의 이미지 이름에서 자동으로 불러와요. 이름은 고정이라 여기서 고치지 않아요.</p>
+      <p class="hint" id="rosterMsg" role="status">우리반 명단은 GitHub 저장소(guselpick)의 이미지 이름에서 자동으로 불러와요. 이름은 고정이에요. 결석한 친구는 체크를 해제하면 이번 뽑기에서 빠져요.</p>
       <div id="advBox" hidden>
       <div class="bar">
         <input type="text" id="addName" placeholder="이름 입력 후 Enter" maxlength="20" style="flex:1">
@@ -348,6 +352,11 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   function saveStats(){ try{ localStorage.setItem('marblepick.stats', JSON.stringify(STATS)); }catch(e){} }
   var DEFAULT_NAMES = ['민준','서연','지우','하준','수아','도윤'];
 
+  /* 오늘 빠지는 사람(결석 등): 이름으로 저장해서 명단을 다시 불러와도 유지돼요 */
+  var ABSENT = {}; try{ (JSON.parse(localStorage.getItem('marblepick.absent')||'[]')||[]).forEach(function(n){ ABSENT[n]=1; }); }catch(e){}
+  function saveAbsent(){ try{ localStorage.setItem('marblepick.absent', JSON.stringify(Object.keys(ABSENT))); }catch(e){} }
+  function isOff(p){ return !!ABSENT[(p.name||'').trim()]; }
+  function active(){ return S.people.filter(function(p){ return !isOff(p); }); }
   function newPerson(name){
     var id = S.nextId++;
     return {id:id, name:name, color:PALETTE[(id-1)%PALETTE.length], imgData:null, img:null};
@@ -408,7 +417,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
     var def = MAPS.filter(function(m){return m.id===S.map})[0] || MAPS[0];
     S.map = def.id;
     WW = def.W;
-    var n = S.people.length;
+    var n = active().length;
     var r = radiusFor(n);
     var cell = 2*r+3;
     var cols = Math.max(1, Math.floor((WW-2*r-4)/cell));
@@ -439,7 +448,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
     w.H = w.finishY + 160;
 
     // 구슬 배치
-    var order = S.people.slice();
+    var order = active();
     for(var i=order.length-1;i>0;i--){ var j=Math.floor(rnd()*(i+1)); var t=order[i]; order[i]=order[j]; order[j]=t; }
     for(var q=0;q<order.length;q++){
       var row = Math.floor(q/cols), col = q%cols;
@@ -784,13 +793,14 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
 
   /* ---------- UI ---------- */
   function updateButtons(){
-    var ok = S.people.length>=2;
+    var ok = active().length>=2;
     $('startBtn').disabled = !ok || S.phase!=='idle';
     $('startBtn').textContent = S.phase==='run' ? '진행 중…' : '구슬 떨어뜨리기';
     $('skipBtn').hidden = S.phase!=='run';
-    $('pcount').textContent = S.people.length+'명';
-    $('wNum').max = Math.max(1,S.people.length);
-    if(S.winners>S.people.length) { S.winners=Math.max(1,S.people.length); $('wNum').value=S.winners; }
+    var na = active().length;
+    $('pcount').textContent = na===S.people.length ? S.people.length+'명' : na+'명 참여 / 전체 '+S.people.length+'명';
+    $('wNum').max = Math.max(1,na);
+    if(S.winners>na) { S.winners=Math.max(1,na); $('wNum').value=S.winners; }
   }
   function renderMaps(){
     var box=$('maps'); box.textContent='';
@@ -816,7 +826,10 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   function renderList(){
     var box=$('plist'); box.textContent='';
     S.people.forEach(function(p,idx){
-      var row=document.createElement('div'); row.className='prow';
+      var row=document.createElement('div'); row.className='prow'+(isOff(p)?' off':'');
+      var cb=document.createElement('input'); cb.type='checkbox'; cb.className='atd'; cb.checked=!isOff(p); cb.setAttribute('aria-label',p.name+' 참여');
+      cb.onchange=function(){ if(S.phase==='run'){ cb.checked=!cb.checked; return; } var k=(p.name||'').trim(); if(cb.checked) delete ABSENT[k]; else ABSENT[k]=1; saveAbsent(); renderList(); resetWorldIfIdle(true); };
+      row.appendChild(cb);
       if(fixedRoster){
         row.appendChild(avEl(p)); var nm=document.createElement('span'); nm.className='t'; nm.textContent=p.name; nm.style.cssText='flex:1;font-weight:500;padding:4px 2px'; row.appendChild(nm);
         box.appendChild(row); return;
@@ -850,7 +863,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
     var sel=$('followSel'); sel.textContent='';
     var o=document.createElement('option'); o.value='0'; o.textContent=S.mode==='first'?'전체 시점 (선두 따라가기)':'전체 시점 (꼴찌 따라가기)'; sel.appendChild(o);
     var has=false;
-    S.people.forEach(function(p){ var op=document.createElement('option'); op.value=String(p.id); op.textContent=p.name+' 시점'; sel.appendChild(op); if(p.id===S.follow) has=true; });
+    active().forEach(function(p){ var op=document.createElement('option'); op.value=String(p.id); op.textContent=p.name+' 시점'; sel.appendChild(op); if(p.id===S.follow) has=true; });
     if(!has) S.follow=0;
     sel.value=String(S.follow);
   }
@@ -875,6 +888,8 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   /* ---------- 이벤트 ---------- */
   $('addBtn').onclick=function(){ if(S.phase==='run') return; if(addPeople([$('addName').value])) $('addName').value=''; $('addName').focus(); };
   $('addName').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); $('addBtn').click(); } });
+  $('allOn').onclick=function(){ if(S.phase==='run') return; ABSENT={}; saveAbsent(); renderList(); resetWorldIfIdle(true); };
+  $('allOff').onclick=function(){ if(S.phase==='run') return; S.people.forEach(function(p){ ABSENT[(p.name||'').trim()]=1; }); saveAbsent(); renderList(); resetWorldIfIdle(true); };
   $('bulkToggle').onclick=function(){ $('bulkBox').hidden=!$('bulkBox').hidden; };
   $('bulkAdd').onclick=function(){
     if(S.phase==='run') return;
@@ -904,7 +919,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
       toast('이름이 맞는 '+matched+'명에 적용하고, 새 참여자 '+made+'명을 추가했어요');
     });
   };
-  function setWinners(v){ v=parseInt(v,10); if(isNaN(v)) v=1; S.winners=clamp(v,1,Math.max(1,S.people.length)); $('wNum').value=S.winners; save(); }
+  function setWinners(v){ v=parseInt(v,10); if(isNaN(v)) v=1; S.winners=clamp(v,1,Math.max(1,active().length)); $('wNum').value=S.winners; save(); }
   $('wMinus').onclick=function(){ setWinners(S.winners-1); };
   $('wPlus').onclick=function(){ setWinners(S.winners+1); };
   $('wNum').onchange=function(){ setWinners($('wNum').value); };
@@ -933,7 +948,7 @@ select{font:inherit;color:var(--ink);background:var(--field);border:1px solid va
   document.addEventListener('visibilitychange',function(){ if(document.hidden) stopMusic(false); });
 
   $('startBtn').onclick=function(){
-    if(S.phase!=='idle'||S.people.length<2) return;
+    if(S.phase!=='idle'||active().length<2) return;
     W.finished=[]; openGate(); S.phase='run'; updateButtons(); renderRank();
     playMusic();
   };

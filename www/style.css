@@ -429,3 +429,15 @@
   .tmmsg{font-size:calc(clamp(1.3rem,5vw,2.2rem) * var(--sz))}
   #ringMsg{font-size:calc(clamp(3rem,min(12vw,18vh),12rem) * var(--rsz));word-break:keep-all}
   body.mini #ringMsg{font-size:calc(min(14vw,26vh) * var(--rsz))}
+  .tmnz{display:flex;align-items:center;justify-content:center;gap:.7rem;margin:.1rem auto .5rem;padding:.35rem .9rem;border-radius:999px;background:var(--glass);border:1px solid var(--border);width:fit-content;max-width:100%}
+  .tmnz .lights{display:flex;gap:.35rem}
+  .tmnz .lights i{width:1rem;height:1rem;border-radius:50%;background:rgba(255,255,255,.14);transition:.15s}
+  .tmnz .lights i:nth-child(1).on{background:#2bd16a;box-shadow:0 0 .8rem #2bd16a}
+  .tmnz .lights i:nth-child(2).on{background:#f5c518;box-shadow:0 0 .8rem #f5c518}
+  .tmnz .lights i:nth-child(3).on{background:#ff4b4b;box-shadow:0 0 .8rem #ff4b4b}
+  .tmnz b{font-variant-numeric:tabular-nums;min-width:2.2rem;text-align:right;opacity:.8}
+  .tmnz #tmNzMsg{font-weight:700;font-size:.95rem}
+  .tmnz #tmNzMsg.ok{color:#2bd16a}.tmnz #tmNzMsg.warn{color:#f5c518}.tmnz #tmNzMsg.bad{color:#ff6b6b}
+  .tmnz.flash{animation:nzflash .6s ease-out}
+  @keyframes nzflash{0%{box-shadow:0 0 0 0 #ff4b4b}100%{box-shadow:0 0 0 1.4rem transparent}}
+  #tmNzSnd[hidden]{display:none}

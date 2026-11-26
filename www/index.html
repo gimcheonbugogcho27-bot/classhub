@@ -78,6 +78,7 @@
       <div class="cap" id="tmCap">타이머</div>
       <div class="wheels" id="tmWheel" aria-label="타이머 시간 맞추기"></div>
       <div class="tmmsg" id="tmMsg" hidden></div>
+      <div class="tmnz" id="tmNzBar" hidden><span class="lights"><i></i><i></i><i></i></span><b id="tmNzNum" class="num">0</b><span id="tmNzMsg"></span></div>
       <div class="big num" id="tmDisp" title="눌러서 시간 직접 입력">05:00</div>
       <div class="bar" id="tmBarWrap"><div id="tmBar"></div></div>
       <div class="ctrls">
@@ -93,6 +94,8 @@
         <button class="btn ghost" id="tmReset">초기화</button>
         <button class="pill" id="tmMus" title="타이머가 돌아가는 동안 잔잔한 피아노곡">🎹 피아노 켬</button>
         <select class="pill" id="tmSong" title="피아노곡 고르기"><option value="1">피아노 1 · 잔잔한</option><option value="2">피아노 2 · 왈츠</option><option value="3">피아노 3 · 맑은 아침</option><option value="4">피아노 4 · 고요한 밤</option></select>
+        <button class="pill" id="tmNz" title="타이머가 돌아가는 동안 마이크로 교실 소음을 신호등으로 보여줘요">🚦 소음 신호등 끔</button>
+        <button class="pill" id="tmNzSnd" hidden>🔔 알림 소리 켬</button>
         <label class="musvol" title="음악 크기">🔈 <input type="range" id="tmMusVol" min="0" max="100" step="1" aria-label="음악 크기"><b id="tmMusVolNum">40</b></label>
         <button class="pill" id="tmRep" title="끝나면 같은 시간으로 계속 반복">🔁 반복 끔</button>
       </div>
@@ -342,6 +345,7 @@
 <script src="vendor/jszip.min.js"></script>
 <script src="marble.js"></script>
 <script src="noise.js"></script>
+<script src="tmnoise.js"></script>
 <script src="update.js"></script>
 </body>
 </html>
