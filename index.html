@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com https://api.github.com https://raw.githubusercontent.com; img-src 'self' data: blob:; media-src 'self' data: blob:;">
+<title>우리반 도구함</title>
+<link rel="icon" href="web-icons/icon-192.png">
+<link rel="apple-touch-icon" href="web-icons/icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="우리반 도구함">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b1026">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="blobs"><i></i><i></i><i></i></div>
+<div id="miniBar">
+  <button class="icon glass" id="miniExit" title="크게 보기 (M)">⤢</button>
+</div>
+
+<div id="updateBar" hidden><span id="updText">🔔 새 버전이 나왔어요</span><button class="pill sel" id="updGo">받기</button><button class="pill" id="updLater">나중에</button></div>
+
+<header>
+  <div class="seg glass" id="tabs">
+    <button class="on" data-t="clock">시계</button>
+    <button data-t="stopwatch">스톱워치</button>
+    <button data-t="timer">타이머</button>
+    <button data-t="alarm">알람</button>
+    <button data-t="qr">QR</button>
+    <button data-t="ai">AI</button>
+    <button data-t="marble">구슬</button>
+    <button data-t="noise">소음</button>
+    <button data-t="board">점수판</button>
+  </div>
+  <div class="tools">
+    <button class="icon glass" id="setBtn" title="소리 설정">⚙️</button>
+    <button class="icon glass" id="themeBtn" title="테마 바꾸기 (T)">☀️</button>
+    <button class="icon glass" id="fsBtn" title="전체화면 (F11)">⛶</button>
+    <button class="icon glass app-only" id="miniBtn" title="작은 창으로 띄우기 (M)">⧉</button>
+    <span class="winctl app-only">
+      <button class="icon" id="wMin" title="최소화">─</button>
+      <button class="icon" id="wMax" title="최대화">☐</button>
+      <button class="icon close" id="wClose" title="닫기">✕</button>
+    </span>
+  </div>
+</header>
+
+<main>
+  <!-- 시계 -->
+  <section id="clock" class="on">
+    <div class="card glass">
+      <div id="cDate"></div>
+      <div class="big num" id="cTime"></div>
+    </div>
+    <div class="world" id="world"></div>
+  </section>
+
+  <!-- 스톱워치 -->
+  <section id="stopwatch">
+    <div class="card glass">
+      <div class="cap">스톱워치</div>
+      <div class="big num" id="swDisp"></div>
+      <div class="row" id="swBtns">
+        <button class="btn primary" id="swStart">시작</button>
+        <button class="btn ghost" id="swLap">기록</button>
+        <button class="btn ghost" id="swReset">초기화</button>
+      </div>
+    </div>
+    <div class="laps" id="laps"></div>
+  </section>
+
+  <!-- 타이머 -->
+  <section id="timer">
+    <audio id="tmBgm" src="audio/piano1.mp3" loop preload="none"></audio>
+    <div class="card glass">
+      <div class="cap" id="tmCap">타이머</div>
+      <div class="wheels" id="tmWheel" aria-label="타이머 시간 맞추기"></div>
+      <div class="tmmsg" id="tmMsg" hidden></div>
+      <div class="tmnz" id="tmNzBar" hidden><span class="lights"><i></i><i></i><i></i></span><b id="tmNzNum" class="num">0</b><span id="tmNzMsg"></span></div>
+      <div class="big num" id="tmDisp" title="눌러서 시간 직접 입력">05:00</div>
+      <div class="bar" id="tmBarWrap"><div id="tmBar"></div></div>
+      <div class="ctrls">
+      <div class="row" id="tmAdj">
+        <button class="pill minus" data-add="-60">− 1분</button>
+        <button class="pill minus" data-add="-10">− 10초</button>
+        <button class="pill plus" data-add="10">+ 10초</button>
+        <button class="pill plus" data-add="60">+ 1분</button>
+        <button class="pill plus" data-add="300">+ 5분</button>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="tmStart">시작</button>
+        <button class="btn ghost" id="tmReset">초기화</button>
+        <button class="pill" id="tmMus" title="타이머가 돌아가는 동안 잔잔한 피아노곡">🎹 피아노 켬</button>
+        <select class="pill" id="tmSong" title="피아노곡 고르기"><option value="1">피아노 1 · 잔잔한</option><option value="2">피아노 2 · 왈츠</option><option value="3">피아노 3 · 맑은 아침</option><option value="4">피아노 4 · 고요한 밤</option></select>
+        <button class="pill" id="tmNz" title="타이머가 돌아가는 동안 마이크로 교실 소음을 신호등으로 보여줘요">🚦 소음 신호등 끔</button>
+        <button class="pill" id="tmNzSnd" hidden>🔔 알림 소리 켬</button>
+        <label class="musvol" title="음악 크기">🔈 <input type="range" id="tmMusVol" min="0" max="100" step="1" aria-label="음악 크기"><b id="tmMusVolNum">40</b></label>
+        <button class="pill" id="tmRep" title="끝나면 같은 시간으로 계속 반복">🔁 반복 끔</button>
+      </div>
+      </div>
+    </div>
+    <div class="row" id="tmPre">
+      <button class="pill" data-set="60">1분</button>
+      <button class="pill" data-set="180">3분</button>
+      <button class="pill sel" data-set="300">5분</button>
+      <button class="pill" data-set="600">10분</button>
+      <button class="pill" data-set="900">15분</button>
+      <button class="pill" data-set="1200">20분</button>
+      <button class="pill" data-set="1800">30분</button>
+      <button class="pill" data-set="2400">40분</button>
+    </div>
+    <div class="row" id="tmRtChips" hidden></div>
+    <details class="card glass tmmsgs" id="tmMsgBox">
+      <summary>💬 안내 글씨 설정 <button class="pill sel" id="tmMsgOn" type="button">💬 안내 글씨 켬</button></summary>
+      <div class="mrow"><span>🔠 글씨 크기</span><select id="tmMsgSz" class="pill"><option value="1">보통</option><option value="2">크게</option><option value="3">아주 크게</option></select><button class="pill" id="tmPreview" type="button">👀 미리보기</button></div>
+      <div class="mlabel">⏱ 총 타이머 시간</div>
+      <div class="mrow"><input type="number" id="tmTotM" min="0" max="599"><span>분</span><input type="number" id="tmTotS" min="0" max="59"><span>초</span></div>
+      <div class="mlabel">시작하자마자 뜨는 글씨 (여러 개면 순서대로, 각각 몇 초 동안)</div>
+      <div id="tmStartList"></div>
+      <button class="pill plus" id="tmStartAdd">+ 시작 글씨 추가</button>
+      <label class="mlabel chk"><input type="checkbox" id="tmStartFull"> 시작 글씨를 화면 전체로 크게 보여주기</label>
+      <div class="mlabel">시작하고 몇 분 뒤에 뜨는 글씨</div>
+      <div id="tmMsgList"></div>
+      <button class="pill plus" id="tmMsgAdd">+ 글씨 추가</button>
+      <label class="mlabel">🏁 타이머가 끝났을 때 뜨는 글씨 (비우면 "시간 끝!")<input type="text" id="tmEndText" maxlength="40" placeholder="예) 활동 끝! 제자리로 돌아가요"></label>
+      <div class="mlabel">🔀 글씨에서 글씨로 넘어갈 때 (0초면 바로 바뀜)</div>
+      <div class="mrow"><input type="number" id="tmGap" min="0" max="120"><span>초 동안</span><input type="text" id="tmGapText" maxlength="40" placeholder="뜨는 글씨 (예: 자리를 옮겨요)"></div>
+      <label class="mlabel chk"><input type="checkbox" id="tmGapIncl" checked> 전환 시간을 총 타이머 시간에 <b>포함</b> (끄면 전환 동안 타이머가 멈춰요)</label>
+      <div class="mlabel">📋 루틴 — 지금 시간과 글씨를 저장해 두고 한 번에 불러와요</div>
+      <div class="mrow"><input type="text" id="tmRtName" maxlength="20" placeholder="루틴 이름 (예: 모둠 토의)"><button class="pill plus" id="tmRtSave">💾 저장</button></div>
+      <div id="tmRtList"></div>
+    </details>
+  </section>
+
+  <!-- 알람 -->
+  <section id="alarm">
+    <div class="card glass">
+      <div class="cap">알람 맞추기</div>
+      <div class="wheels" id="aWheel" aria-label="알람 시각 맞추기"></div>
+      <div class="cap" id="aPreview"></div>
+      <div class="row">
+        <input class="memo" id="aMemo" placeholder="메모 (예: 쉬는 시간 끝)" maxlength="20">
+        <button class="btn primary" id="aAdd">추가</button>
+      </div>
+    </div>
+    <div class="alist" id="aList"></div>
+  </section>
+
+  <!-- QR 만들기 -->
+  <section id="qr" class="scroll">
+    <div class="card glass panel">
+      <div class="cap">제목과 주소를 넣으면 QR 이미지를 만들어요</div>
+      <label for="qTitle">제목</label>
+      <input class="field" id="qTitle" type="text" placeholder="예) 4학년 4반 학급 게시판" autocomplete="off" spellcheck="false">
+      <label for="qUrl">URL (주소)</label>
+      <input class="field" id="qUrl" type="url" inputmode="url" placeholder="https://..." autocomplete="off" spellcheck="false" autocapitalize="off">
+      <button class="btn primary" id="qMake">QR 코드 만들기</button>
+      <div class="err" id="qErr"></div>
+    </div>
+    <div class="card glass panel" id="qResult" hidden>
+      <canvas id="qrCanvas"></canvas>
+      <div class="urltext" id="qUrlText"></div>
+      <div class="row">
+        <button class="btn ghost" id="qCopy">🔗 주소 복사</button>
+        <button class="btn primary" id="qSave">💾 이미지 저장</button>
+      </div>
+    </div>
+    <div class="card glass panel">
+      <div class="hist-head"><b>🕘 최근 만든 QR</b><button class="del" id="qClear">전체 삭제</button></div>
+      <ul id="qHistory"></ul>
+    </div>
+  </section>
+
+  <!-- 구슬 뽑기 (화면은 marble.js 가 만듭니다) -->
+  <section id="marble" class="scroll"></section>
+
+  <!-- 점수판 (여러 개 동시에) -->
+  <section id="board" class="scroll">
+    <div class="sbbar">
+      <button class="pill plus" id="sbAddTeam">+ 모둠 점수판</button>
+      <button class="pill plus" id="sbAddVs">+ 두 팀 대결</button>
+      <button class="pill plus" id="sbAddBlank">+ 빈 점수판</button>
+    </div>
+    <div class="sbgrid" id="sbGrid"></div>
+  </section>
+
+  <!-- 소음 측정기 -->
+  <section id="noise" class="scroll">
+    <div class="card glass nz" id="nzCard">
+      <div class="cap">교실 소음 측정기</div>
+      <div class="nzlight" id="nzLight"><i></i><i></i><i></i></div>
+      <div class="big num" id="nzMsg">마이크가 꺼져 있어요</div>
+      <div class="nzlvl"><b class="num" id="nzNum">0</b><span>소리 크기 (0~250)</span></div>
+      <div class="nzbar" id="nzBar"><div id="nzFill"></div><u id="nzY"></u><u id="nzR"></u></div>
+      <canvas id="nzGraph" width="600" height="90"></canvas>
+      <div class="row">
+        <button class="btn primary" id="nzStart">마이크 켜기</button>
+        <button class="btn ghost" id="nzCal">지금 소리를 '조용'으로 맞추기</button>
+      </div>
+      <div class="nzsl">
+        <label>🟡 노랑 기준 <b class="num" id="nzYv">100</b><input type="range" id="nzYs" min="0" max="250" step="1"></label>
+        <label>🔴 빨강 기준 <b class="num" id="nzRv">155</b><input type="range" id="nzRs" min="0" max="250" step="1"></label>
+      </div>
+      <div class="row" id="nzPre">
+        <button class="pill" data-p="strict">엄격</button>
+        <button class="pill sel" data-p="normal">보통</button>
+        <button class="pill" data-p="loose">느슨 (활동 수업)</button>
+      </div>
+      <div class="row">
+        <button class="pill sel" id="nzSnd">🔔 너무 시끄러우면 소리로 알림</button>
+        <span class="nzcount">경고 <b class="num" id="nzCnt">0</b>번</span>
+        <button class="pill" id="nzReset">횟수 지우기</button>
+      </div>
+      <div class="cap" id="nzNote">마이크 소리는 이 기기 안에서만 크기를 재고, 녹음하거나 저장하지 않아요.</div>
+    </div>
+  </section>
+
+  <!-- AI 대화 -->
+  <section id="ai">
+    <div class="panel aihead">
+      <select id="aiModel" class="field" title="AI 모델"></select>
+      <button class="pill" id="aiListBtn" title="저장된 대화 목록">📂 대화목록</button>
+      <button class="pill" id="aiNew" title="새 대화 시작">➕ 새 대화</button>
+      <button class="pill ic" id="aiExport" title="이 대화를 파일로 저장">💾</button>
+      <button class="pill ic" id="aiPrint" title="이 대화 인쇄 (A4)">🖨</button>
+      <button class="pill" id="aiKeyBtn" title="Google API 키 설정">🔑 API 키</button>
+    </div>
+    <button class="panel aihint" id="aiHint" hidden>🔑 처음 한 번, Google AI Studio에서 받은 API 키를 넣어 주세요 (누르면 열려요)</button>
+    <div class="panel card glass chatbox" id="aiChat"></div>
+    <div class="panel row quick" id="aiQuick"></div>
+    <div class="panel imgbar" id="aiImgBar" hidden>
+      <select id="aiImgModel" class="field" title="그림 모델"></select>
+      <select id="aiImgAr" class="field" title="그림 비율"></select>
+    </div>
+    <div class="panel toolrow">
+      <button class="pill" id="aiPhoto" title="사진 붙이기 (최대 3장)">📷 사진</button>
+      <button class="pill" id="aiPromptBtn" title="내 질문 (자주 쓰는 질문)">⭐ 내 질문</button>
+      <button class="pill" id="aiSearchBtn" title="Google 검색으로 최신 정보 찾기">🔍 검색 켬</button>
+      <button class="pill" id="aiImgBtn" title="그림 만들기 모드 켜기/끄기">🎨 그림 만들기</button>
+    </div>
+    <div class="panel attrow" id="aiAtt" hidden></div>
+    <div class="panel aiinput">
+      <input type="file" id="aiFile" accept="image/*" multiple hidden>
+      <textarea id="aiIn" class="field" rows="1" placeholder="질문을 입력하세요 (Enter 보내기 · Shift+Enter 줄바꿈)"></textarea>
+      <button class="btn primary" id="aiSend">보내기</button>
+    </div>
+  </section>
+</main>
+
+<div id="pad" class="overlay">
+  <div class="card glass padcard">
+    <div class="cap">타이머 시간 입력</div>
+    <div class="num padshow" id="padShow">00:00</div>
+    <div class="keys" id="keys">
+      <button>1</button><button>2</button><button>3</button>
+      <button>4</button><button>5</button><button>6</button>
+      <button>7</button><button>8</button><button>9</button>
+      <button data-k="00">00</button><button>0</button><button data-k="del">⌫</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="padCancel">취소</button>
+      <button class="btn primary" id="padOk">확인</button>
+    </div>
+  </div>
+</div>
+
+<div id="settings" class="overlay">
+  <div class="card glass setcard">
+    <div class="sethead"><b>소리 설정</b><button class="del" id="setClose" title="닫기">✕</button></div>
+
+    <div class="setlabel">알람 소리</div>
+    <div class="sndlist" id="sndList"></div>
+
+    <div class="setlabel">음량 <span id="volVal"></span></div>
+    <input type="range" id="vol" min="0" max="100" step="5">
+
+    <div class="setlabel">울림 자동 멈춤</div>
+    <div class="row" id="autoStop">
+      <button class="pill" data-s="30">30초</button>
+      <button class="pill" data-s="60">1분</button>
+      <button class="pill" data-s="180">3분</button>
+      <button class="pill" data-s="0">안 멈춤</button>
+    </div>
+    <div class="setnote" id="setNote"></div>
+  </div>
+</div>
+
+<div id="ring">
+  <div class="card glass">
+    <div id="ringMsg">시간 끝!</div>
+    <div class="cap">화면을 누르면 멈춰요<span id="ringAuto"></span></div>
+    <button class="btn primary" id="ringStop">끄기</button>
+  </div>
+</div>
+
+<div id="qModal" class="overlay">
+  <div class="card glass padcard">
+    <div class="cap">기록을 모두 지울까요?</div>
+    <div class="row">
+      <button class="btn ghost" id="qNo">취소</button>
+      <button class="btn primary" id="qYes">삭제</button>
+    </div>
+  </div>
+</div>
+
+<div id="aiList" class="overlay">
+  <div class="card glass setcard">
+    <div class="sethead"><b>대화 목록</b><button class="del" id="aiListClose" title="닫기">✕</button></div>
+    <button class="btn primary" id="aiListNew">➕ 새 대화 시작</button>
+    <input class="field" id="aiSearch" type="search" placeholder="🔍 제목·내용으로 찾기" autocomplete="off">
+    <ul id="aiConvs"></ul>
+  </div>
+</div>
+
+<div id="aiPrompts" class="overlay">
+  <div class="card glass setcard">
+    <div class="sethead"><b>⭐ 내 질문</b><button class="del" id="aiPromptClose" title="닫기">✕</button></div>
+    <textarea class="field" id="aiPromptNew" rows="3" placeholder="자주 쓰는 질문을 적고 [저장]을 누르세요 (입력창에 쓰던 내용이 들어와 있어요)"></textarea>
+    <button class="btn primary" id="aiPromptSave">저장</button>
+    <div class="setnote">저장된 질문을 누르면 입력창에 들어가요.</div>
+    <ul id="aiPromptList"></ul>
+  </div>
+</div>
+
+<div id="aiSet" class="overlay">
+  <div class="card glass setcard">
+    <div class="sethead"><b>AI 설정 (Google Gemini)</b><button class="del" id="aiSetClose" title="닫기">✕</button></div>
+    <div class="setlabel">Google API 키</div>
+    <div class="keyrow">
+      <input class="field" id="aiKey" type="password" placeholder="AIza..." autocomplete="off" spellcheck="false" autocapitalize="off">
+      <button class="pill" id="aiKeyEye" title="보이기/숨기기">👁</button>
+    </div>
+    <div class="setnote">aistudio.google.com/apikey 에서 무료로 만들 수 있어요. 키는 이 기기에만 저장되고 Google 서버로만 전송돼요. 다른 사람과 공유하는 컴퓨터에서는 쓰고 나서 [키 지우기]를 눌러 주세요.</div>
+    <div class="setlabel">AI 역할 (선택)</div>
+    <textarea class="field" id="aiSys" rows="3"></textarea>
+    <div class="row">
+      <button class="btn ghost" id="aiKeyDel">키 지우기</button>
+      <button class="btn primary" id="aiKeySave">저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+<div id="toast" class="toast"></div>
+
+<script src="qrcode-lib.js"></script>
+<script src="wheel.js"></script>
+<script src="app.js"></script>
+<script src="qr.js"></script>
+<script src="config.js"></script>
+<script src="ai.js"></script>
+<script src="vendor/planck.min.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="marble.js"></script>
+<script src="noise.js"></script>
+<script src="tmnoise.js"></script>
+<script src="scoreboard.js"></script>
+<script src="update.js"></script>
+</body>
+</html>
